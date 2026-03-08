@@ -11,7 +11,7 @@ interface Trend {
   max: number
 }
 
-function computeTrends(data: Float32Array, sampleRate: number, bucketSize = 4410): Trend[] {
+function computeTrends(data: Float32Array, sampleRate: number, bucketSize = 4410 * 0.4): Trend[] {
   const trends: Trend[] = []
 
   for (let i = 0; i < data.length; i += bucketSize) {
@@ -72,7 +72,7 @@ function trendsToVibrationPattern(trends: Trend[]): number[] {
 
 // https://cdn.pixabay.com/audio/2025/05/27/audio_3331fe5270.mp3 (simple gun)
 // https://cdn.pixabay.com/audio/2025/10/21/audio_92be5a14ad.mp3 (sniper)
-// https://cdn.pixabay.com/audio/2022/03/21/audio_f0e01c4b7a.mp3 (ball bouncing, maybe use slop instead)
+// https://cdn.pixabay.com/audio/2022/03/21/audio_f0e01c4b7a.mp3 (ball bouncing)
 // https://cdn.pixabay.com/audio/2022/03/19/audio_1712057a76.mp3 (hammering a nail, not the best example)
 // https://cdn.pixabay.com/audio/2022/03/10/audio_fecee3808e.mp3 (hammering a nail, a little better)
 
@@ -186,7 +186,7 @@ function ResultView({ result, trends, pattern }: { result: AnalysisResult; trend
       <p>Channels: {result.numberOfChannels}</p>
       <p>Total Samples: {result.channelData.length.toLocaleString()}</p>
 
-      <h3>Trends (absolute values, per ~0.1s bucket)</h3>
+      <h3>Trends (absolute values)</h3>
       <div style={{ maxHeight: '400px', overflow: 'auto', fontSize: '13px', fontFamily: 'monospace' }}>
         {trends.map((t, i) => (
           <div key={i} style={{ padding: '2px 0' }}>
