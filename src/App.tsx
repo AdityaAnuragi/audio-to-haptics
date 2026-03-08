@@ -45,13 +45,47 @@ function computeTrends(data: Float32Array, sampleRate: number, bucketSize = 4410
   return trends
 }
 
+function trendsToVibrationPattern(trends: Trend[]): number[] {
+  // Build alternating [vibrate, pause, vibrate, pause, ...] array
+  // "loud" and "very loud" = vibrate, everything else = pause
+  const segments: { vibrate: boolean; ms: number }[] = []
+
+  for (const t of trends) {
+    const ms = Math.round((t.endTime - t.startTime) * 1000)
+    const vibrate = t.max >= 0.3
+
+    const last = segments[segments.length - 1]
+    if (last && last.vibrate === vibrate) {
+      last.ms += ms
+    } else {
+      segments.push({ vibrate, ms })
+    }
+  }
+
+  // Vibration API pattern starts with vibrate — if first segment is a pause, prepend 0
+  if (segments.length > 0 && !segments[0].vibrate) {
+    segments.unshift({ vibrate: true, ms: 0 })
+  }
+
+  return segments.map((s) => s.ms)
+}
+
+// https://cdn.pixabay.com/audio/2025/05/27/audio_3331fe5270.mp3 (simple gun)
+// https://cdn.pixabay.com/audio/2025/10/21/audio_92be5a14ad.mp3 (sniper)
+// https://cdn.pixabay.com/audio/2022/03/21/audio_f0e01c4b7a.mp3 (ball bouncing, maybe use slop instead)
+// https://cdn.pixabay.com/audio/2022/03/19/audio_1712057a76.mp3 (hammering a nail, not the best example)
+// https://cdn.pixabay.com/audio/2022/03/10/audio_fecee3808e.mp3 (hammering a nail, a little better)
+
 function App() {
-  const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2025/05/27/audio_3331fe5270.mp3\n')
+  const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2025/05/27/audio_3331fe5270.mp3')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [playing, setPlaying] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  const trends = useMemo(() => result ? computeTrends(result.channelData, result.sampleRate) : [], [result])
+  const pattern = useMemo(() => trendsToVibrationPattern(trends), [trends])
 
   const handleAnalyze = async () => {
     setLoading(true)
@@ -85,39 +119,68 @@ function App() {
         </button>
       </div>
 
-      <button
-        onClick={() => {
-          if (playing) {
-            audioRef.current?.pause()
-            audioRef.current = null
-            setPlaying(false)
-          } else {
-            const audio = new Audio(url)
-            audio.onended = () => setPlaying(false)
-            audio.play()
-            audioRef.current = audio
-            setPlaying(true)
-          }
-        }}
-        disabled={!url}
-        style={{ marginBottom: '16px' }}
-      >
-        {playing ? 'Stop' : 'Play'}
-      </button>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+        <button
+          onClick={() => {
+            if (playing) {
+              audioRef.current?.pause()
+              audioRef.current = null
+              navigator.vibrate(0)
+              setPlaying(false)
+            } else {
+              const audio = new Audio(url)
+              audio.onended = () => { navigator.vibrate(0); setPlaying(false) }
+              audio.play()
+              audioRef.current = audio
+              setPlaying(true)
+            }
+          }}
+          disabled={!url}
+        >
+          {playing ? 'Stop' : 'Play'}
+        </button>
+        <button
+          onClick={() => {
+            if (playing) {
+              audioRef.current?.pause()
+              audioRef.current = null
+              navigator.vibrate(0)
+              setPlaying(false)
+            } else {
+              const audio = new Audio(url)
+              audio.onended = () => { navigator.vibrate(0); setPlaying(false) }
+              audio.play()
+              navigator.vibrate(pattern)
+              audioRef.current = audio
+              setPlaying(true)
+            }
+          }}
+          disabled={!url || pattern.length === 0}
+        >
+          {playing ? 'Stop' : 'Play + Vibrate'}
+        </button>
+      </div>
 
       {error && <p style={{ color: '#ff6b6b' }}>Error: {error}</p>}
 
-      {result && <ResultView result={result} />}
+      {result && <ResultView result={result} trends={trends} pattern={pattern} />}
     </div>
   )
 }
 
-function ResultView({ result }: { result: AnalysisResult }) {
-  const trends = useMemo(() => computeTrends(result.channelData, result.sampleRate), [result.channelData, result.sampleRate])
-
+function ResultView({ result, trends, pattern }: { result: AnalysisResult; trends: Trend[]; pattern: number[] }) {
   return (
     <div style={{ textAlign: 'left' }}>
       <h2>Result</h2>
+      <button onClick={() => navigator.vibrate(pattern)}>
+        Vibrate
+      </button>
+      <button onClick={() => navigator.vibrate(0)} style={{ marginLeft: '8px' }}>
+        Stop Vibration
+      </button>
+      <p style={{ fontSize: '12px', color: '#888' }}>
+        Pattern: [{pattern.join(', ')}] ({pattern.length} entries)
+      </p>
       <p>Sample Rate: {result.sampleRate} Hz</p>
       <p>Duration: {result.duration.toFixed(2)}s</p>
       <p>Channels: {result.numberOfChannels}</p>
