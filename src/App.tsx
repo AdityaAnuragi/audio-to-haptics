@@ -9,36 +9,48 @@ interface Trend {
   endTime: number
   min: number
   max: number
+  leftMax: number
+  rightMax: number
 }
 
-function computeTrends(data: Float32Array, sampleRate: number, bucketSize = 4410 * 0.4): Trend[] {
+function computeTrends(data: Float32Array, sampleRate: number, bucketSize = 4410 * 0.75): Trend[] {
   const trends: Trend[] = []
 
   for (let i = 0; i < data.length; i += bucketSize) {
     const end = Math.min(i + bucketSize, data.length)
+    const mid = Math.floor((i + end) / 2)
     let min = Infinity
     let max = -Infinity
+    let leftMax = -Infinity
+    let rightMax = -Infinity
 
     for (let j = i; j < end; j++) {
       const v = Math.abs(data[j])
       if (v < min) min = v
       if (v > max) max = v
+      if (j < mid) {
+        if (v > leftMax) leftMax = v
+      } else {
+        if (v > rightMax) rightMax = v
+      }
     }
 
     // round for readability
     min = Math.round(min * 1000) / 1000
     max = Math.round(max * 1000) / 1000
+    leftMax = Math.round(leftMax * 1000) / 1000
+    rightMax = Math.round(rightMax * 1000) / 1000
 
     const startTime = i / sampleRate
     const endTime = (end - 1) / sampleRate
 
     const last = trends[trends.length - 1]
     // merge with previous trend if same range
-    if (last && last.min === min && last.max === max) {
+    if (last && last.min === min && last.max === max && last.leftMax === leftMax && last.rightMax === rightMax) {
       last.endIndex = end - 1
       last.endTime = endTime
     } else {
-      trends.push({ startIndex: i, endIndex: end - 1, startTime, endTime, min, max })
+      trends.push({ startIndex: i, endIndex: end - 1, startTime, endTime, min, max, leftMax, rightMax })
     }
   }
 
@@ -52,7 +64,9 @@ function trendsToVibrationPattern(trends: Trend[]): number[] {
 
   for (const t of trends) {
     const ms = Math.round((t.endTime - t.startTime) * 1000)
-    const vibrate = t.max >= 0.3
+    const isLoud = t.max >= 0.3
+    const isStabilized = (t.rightMax - t.leftMax) < 0.1
+    const vibrate = isLoud && isStabilized
 
     const last = segments[segments.length - 1]
     if (last && last.vibrate === vibrate) {
@@ -84,7 +98,7 @@ function classifyLoudness(max: number): { label: string; color: string } {
 }
 
 function App() {
-  const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2025/05/27/audio_3331fe5270.mp3')
+  const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2025/10/21/audio_92be5a14ad.mp3')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<AnalysisResult | null>(null)
@@ -203,9 +217,17 @@ function ResultView({ result, trends, pattern }: { result: AnalysisResult; trend
             </span>{' '}
             {(() => {
               const { label, color } = classifyLoudness(t.max)
+              const diff = Math.round((t.rightMax - t.leftMax) * 1000) / 1000
+              const isLoud = t.max >= 0.3
+              const isStabilized = diff < 0.1
+              const willVibrate = isLoud && isStabilized
               return <>
                 <span style={{ color }}>{label}</span>
                 {t.max > 0 && ` (${t.min} – ${t.max})`}
+                {' '}<span style={{ color: '#888' }}>L:{t.leftMax} R:{t.rightMax} ({diff >= 0 ? '+' : ''}{diff})</span>
+                {' '}<span style={{ color: willVibrate ? '#0ff' : '#555', fontWeight: willVibrate ? 'bold' : 'normal' }}>
+                  {willVibrate ? 'VIBRATE' : 'skip'}
+                </span>
               </>
             })()}
           </div>
