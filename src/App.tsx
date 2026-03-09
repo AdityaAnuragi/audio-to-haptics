@@ -57,6 +57,10 @@ function computeTrends(data: Float32Array, sampleRate: number, bucketSize = 4410
   return trends
 }
 
+function shouldVibrate(t: Trend): boolean {
+  return (t.max >= 0.5) && ((t.rightMax - t.leftMax) < 0.1)
+}
+
 function trendsToVibrationPattern(trends: Trend[]): number[] {
   // Build alternating [vibrate, pause, vibrate, pause, ...] array
   // "loud" and "very loud" = vibrate, everything else = pause
@@ -64,9 +68,7 @@ function trendsToVibrationPattern(trends: Trend[]): number[] {
 
   for (const t of trends) {
     const ms = Math.round((t.endTime - t.startTime) * 1000)
-    const isLoud = t.max >= 0.3
-    const isStabilized = (t.rightMax - t.leftMax) < 0.1
-    const vibrate = isLoud && isStabilized
+    const vibrate = shouldVibrate(t)
 
     const last = segments[segments.length - 1]
     if (last && last.vibrate === vibrate) {
@@ -84,11 +86,34 @@ function trendsToVibrationPattern(trends: Trend[]): number[] {
   return segments.map((s) => s.ms)
 }
 
+// threshold value of 0.3
+// https://cdn.pixabay.com/audio/2022/03/10/audio_888827b659.mp3 (truck)
+
+// threshold value of 0.4
 // https://cdn.pixabay.com/audio/2025/05/27/audio_3331fe5270.mp3 (simple gun)
 // https://cdn.pixabay.com/audio/2025/10/21/audio_92be5a14ad.mp3 (sniper)
 // https://cdn.pixabay.com/audio/2022/03/21/audio_f0e01c4b7a.mp3 (ball bouncing)
 // https://cdn.pixabay.com/audio/2022/03/19/audio_1712057a76.mp3 (hammering a nail, not the best example)
 // https://cdn.pixabay.com/audio/2022/03/10/audio_fecee3808e.mp3 (hammering a nail, a little better)
+
+// threshold value of 0.5
+// https://cdn.pixabay.com/audio/2024/06/19/audio_68b1203fa2.mp3 (chainsaw, best eg)
+// https://cdn.pixabay.com/audio/2022/03/15/audio_f683707390.mp3 (chainsaw, )
+// https://cdn.pixabay.com/audio/2022/03/10/audio_d5bb26c341.mp3 (chainsaw, quite weak)
+// https://cdn.pixabay.com/audio/2022/12/06/audio_e25cf45a1c.mp3 (chainsaw, this is also really really good)
+// https://cdn.pixabay.com/audio/2022/11/05/audio_997c8fe344.mp3 (beep beep I'm a sheep)
+// https://cdn.pixabay.com/audio/2022/03/15/audio_045f46ad75.mp3 (bike passing by)
+// https://cdn.pixabay.com/audio/2022/03/10/audio_62476ec2db.mp3 (bike firing, utterfail this one)
+// https://cdn.pixabay.com/audio/2025/05/07/audio_208fe5a4c3.mp3 (bike rev)
+// https://cdn.pixabay.com/audio/2022/03/10/audio_6bb0a8df69.mp3
+// https://cdn.pixabay.com/audio/2024/12/03/audio_731302cf58.mp3 (bike taking off, this is also really good)
+// https://cdn.pixabay.com/audio/2024/01/24/audio_23938106b7.mp3 (bike, good)
+// https://cdn.pixabay.com/audio/2026/02/25/audio_44dfed5596.mp3 (car engine, bad)
+// https://cdn.pixabay.com/audio/2024/10/27/audio_c331d77d7e.mp3 (swords, eh)
+
+
+
+
 
 function classifyLoudness(max: number): { label: string; color: string } {
   if (max === 0) return { label: 'silence', color: '#666' }
@@ -98,7 +123,7 @@ function classifyLoudness(max: number): { label: string; color: string } {
 }
 
 function App() {
-  const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2025/10/21/audio_92be5a14ad.mp3')
+  const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2024/01/24/audio_23938106b7.mp3')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<AnalysisResult | null>(null)
@@ -230,11 +255,7 @@ function ResultView({ result, trends, pattern }: { result: AnalysisResult; trend
 
       <h3>Trends (absolute values)</h3>
       <div style={{ maxHeight: '400px', overflow: 'auto', fontSize: '13px', fontFamily: 'monospace' }}>
-        {trends.filter(t => {
-          const isLoud = t.max >= 0.3
-          const isStabilized = (t.rightMax - t.leftMax) < 0.1
-          return isLoud && isStabilized
-        }).map((t, i) => (
+        {trends.filter(shouldVibrate).map((t, i) => (
           <div key={i} style={{ padding: '2px 0' }}>
             {t.startTime.toFixed(2)}s – {t.endTime.toFixed(2)}s{' '}
             <span style={{ color: '#888' }}>
