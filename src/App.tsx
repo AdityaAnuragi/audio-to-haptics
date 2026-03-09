@@ -76,6 +76,13 @@ function trendsToVibrationPattern(trends: Trend[]): number[] {
 // https://cdn.pixabay.com/audio/2022/03/19/audio_1712057a76.mp3 (hammering a nail, not the best example)
 // https://cdn.pixabay.com/audio/2022/03/10/audio_fecee3808e.mp3 (hammering a nail, a little better)
 
+function classifyLoudness(max: number): { label: string; color: string } {
+  if (max === 0) return { label: 'silence', color: '#666' }
+  if (max < 0.3) return { label: 'quiet', color: '#6b9' }
+  if (max < 0.7) return { label: 'loud', color: '#db6' }
+  return { label: 'very loud', color: '#f66' }
+}
+
 function App() {
   const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2025/05/27/audio_3331fe5270.mp3')
   const [loading, setLoading] = useState(false)
@@ -195,8 +202,7 @@ function ResultView({ result, trends, pattern }: { result: AnalysisResult; trend
               [{t.startIndex.toLocaleString()} – {t.endIndex.toLocaleString()}]
             </span>{' '}
             {(() => {
-              const label = t.max === 0 ? 'silence' : t.max < 0.3 ? 'quiet' : t.max < 0.7 ? 'loud' : 'very loud'
-              const color = t.max === 0 ? '#666' : t.max < 0.3 ? '#6b9' : t.max < 0.7 ? '#db6' : '#f66'
+              const { label, color } = classifyLoudness(t.max)
               return <>
                 <span style={{ color }}>{label}</span>
                 {t.max > 0 && ` (${t.min} – ${t.max})`}
