@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { analyzeAudio, type AnalysisResult } from './audio/analyzeAudio'
 
@@ -13,7 +13,7 @@ interface Trend {
   rightMax: number
 }
 
-function computeTrends(data: Float32Array, sampleRate: number, bucketSize = 4410 * 0.75): Trend[] {
+function computeTrends(data: Float32Array, sampleRate: number, bucketSize = 4410 * 0.6): Trend[] {
   const trends: Trend[] = []
 
   for (let i = 0; i < data.length; i += bucketSize) {
@@ -103,7 +103,25 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [playing, setPlaying] = useState(false)
+  const [elapsed, setElapsed] = useState(0)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const startTimeRef = useRef<number>(0)
+  const rafRef = useRef<number>(0)
+
+  useEffect(() => {
+    if (playing) {
+      startTimeRef.current = performance.now()
+      const tick = () => {
+        setElapsed(performance.now() - startTimeRef.current)
+        rafRef.current = requestAnimationFrame(tick)
+      }
+      rafRef.current = requestAnimationFrame(tick)
+    } else {
+      cancelAnimationFrame(rafRef.current)
+      setElapsed(0)
+    }
+    return () => cancelAnimationFrame(rafRef.current)
+  }, [playing])
 
   const trends = useMemo(() => result ? computeTrends(result.channelData, result.sampleRate) : [], [result])
   const pattern = useMemo(() => trendsToVibrationPattern(trends), [trends])
@@ -180,6 +198,9 @@ function App() {
         >
           {playing ? 'Stop' : 'Play + Vibrate'}
         </button>
+        {playing && <span style={{ fontFamily: 'monospace', fontSize: '16px', alignSelf: 'center' }}>
+          {(elapsed / 1000).toFixed(3)}s
+        </span>}
       </div>
 
       {error && <p style={{ color: '#ff6b6b' }}>Error: {error}</p>}
@@ -209,7 +230,11 @@ function ResultView({ result, trends, pattern }: { result: AnalysisResult; trend
 
       <h3>Trends (absolute values)</h3>
       <div style={{ maxHeight: '400px', overflow: 'auto', fontSize: '13px', fontFamily: 'monospace' }}>
-        {trends.map((t, i) => (
+        {trends.filter(t => {
+          const isLoud = t.max >= 0.3
+          const isStabilized = (t.rightMax - t.leftMax) < 0.1
+          return isLoud && isStabilized
+        }).map((t, i) => (
           <div key={i} style={{ padding: '2px 0' }}>
             {t.startTime.toFixed(2)}s – {t.endTime.toFixed(2)}s{' '}
             <span style={{ color: '#888' }}>
@@ -218,16 +243,11 @@ function ResultView({ result, trends, pattern }: { result: AnalysisResult; trend
             {(() => {
               const { label, color } = classifyLoudness(t.max)
               const diff = Math.round((t.rightMax - t.leftMax) * 1000) / 1000
-              const isLoud = t.max >= 0.3
-              const isStabilized = diff < 0.1
-              const willVibrate = isLoud && isStabilized
               return <>
                 <span style={{ color }}>{label}</span>
-                {t.max > 0 && ` (${t.min} – ${t.max})`}
+                {` (${t.min} – ${t.max})`}
                 {' '}<span style={{ color: '#888' }}>L:{t.leftMax} R:{t.rightMax} ({diff >= 0 ? '+' : ''}{diff})</span>
-                {' '}<span style={{ color: willVibrate ? '#0ff' : '#555', fontWeight: willVibrate ? 'bold' : 'normal' }}>
-                  {willVibrate ? 'VIBRATE' : 'skip'}
-                </span>
+                {' '}<span style={{ color: '#0ff', fontWeight: 'bold' }}>VIBRATE</span>
               </>
             })()}
           </div>
