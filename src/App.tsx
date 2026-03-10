@@ -9,8 +9,8 @@ interface Trend {
   endTime: number
   min: number
   max: number
-  leftMax: number
-  rightMax: number
+  leftRms: number
+  rightRms: number
 }
 
 function computeTrends(data: Float32Array, sampleRate: number, bucketSize = 4410 * 0.6): Trend[] {
@@ -21,36 +21,41 @@ function computeTrends(data: Float32Array, sampleRate: number, bucketSize = 4410
     const mid = Math.floor((i + end) / 2)
     let min = Infinity
     let max = -Infinity
-    let leftMax = -Infinity
-    let rightMax = -Infinity
+    let leftSumOfSquares = 0
+    let rightSumOfSquares = 0
 
     for (let j = i; j < end; j++) {
       const v = Math.abs(data[j])
       if (v < min) min = v
       if (v > max) max = v
       if (j < mid) {
-        if (v > leftMax) leftMax = v
+        leftSumOfSquares += v * v
       } else {
-        if (v > rightMax) rightMax = v
+        rightSumOfSquares += v * v
       }
     }
+
+    const leftCount = mid - i
+    const rightCount = end - mid
+    let leftRms = Math.sqrt(leftSumOfSquares / (leftCount || 1))
+    let rightRms = Math.sqrt(rightSumOfSquares / (rightCount || 1))
 
     // round for readability
     min = Math.round(min * 1000) / 1000
     max = Math.round(max * 1000) / 1000
-    leftMax = Math.round(leftMax * 1000) / 1000
-    rightMax = Math.round(rightMax * 1000) / 1000
+    leftRms = Math.round(leftRms * 1000) / 1000
+    rightRms = Math.round(rightRms * 1000) / 1000
 
     const startTime = i / sampleRate
     const endTime = (end - 1) / sampleRate
 
     const last = trends[trends.length - 1]
     // merge with previous trend if same range
-    if (last && last.min === min && last.max === max && last.leftMax === leftMax && last.rightMax === rightMax) {
+    if (last && last.min === min && last.max === max && last.leftRms === leftRms && last.rightRms === rightRms) {
       last.endIndex = end - 1
       last.endTime = endTime
     } else {
-      trends.push({startIndex: i, endIndex: end - 1, startTime, endTime, min, max, leftMax, rightMax})
+      trends.push({startIndex: i, endIndex: end - 1, startTime, endTime, min, max, leftRms, rightRms})
     }
   }
 
@@ -58,11 +63,11 @@ function computeTrends(data: Float32Array, sampleRate: number, bucketSize = 4410
 }
 
 function shouldVibrate(t: Trend): boolean {
-  const diff = t.rightMax - t.leftMax
+  const diff = t.rightRms - t.leftRms
   const threshold = 0.5
-  const lowerBound = -0.4
+  const lowerBound = -0.3
   const upperBound = 0.02
-  return (t.max >= threshold) && (diff >= lowerBound && diff <= upperBound)
+  return (t.max >= threshold) && (lowerBound <= diff && diff <= upperBound)
   // return (t.max >= 0.5) && (diff < 0.1)
 }
 
@@ -111,7 +116,7 @@ function trendsToVibrationPattern(trends: Trend[]): number[] {
 // https://cdn.pixabay.com/audio/2022/03/10/audio_62476ec2db.mp3 (bike firing, utterfail this one)
 // https://cdn.pixabay.com/audio/2025/05/07/audio_208fe5a4c3.mp3 (bike rev)
 // https://cdn.pixabay.com/audio/2022/03/10/audio_6bb0a8df69.mp3
-// https://cdn.pixabay.com/audio/2024/12/03/audio_731302cf58.mp3 (bike taking off, now it's bad with new algo)
+// https://cdn.pixabay.com/audio/2024/12/03/audio_731302cf58.mp3 (bike taking off)
 // https://cdn.pixabay.com/audio/2024/01/24/audio_23938106b7.mp3 (bike, good, const threshold = 0.5 const lowerBound = -0.4 const upperBound = 0.02)
 // https://cdn.pixabay.com/audio/2026/02/25/audio_44dfed5596.mp3 (car engine, bad)
 // https://cdn.pixabay.com/audio/2024/10/27/audio_c331d77d7e.mp3 (swords, eh)
@@ -125,7 +130,7 @@ function classifyLoudness(max: number): { label: string; color: string } {
 }
 
 function App() {
-  const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2024/01/24/audio_23938106b7.mp3')
+  const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2024/12/03/audio_731302cf58.mp3')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<AnalysisResult | null>(null)
@@ -275,11 +280,11 @@ function ResultView({result, trends, pattern}: { result: AnalysisResult; trends:
             </span>{' '}
                 {(() => {
                   const {label, color} = classifyLoudness(t.max)
-                  const diff = Math.round((t.rightMax - t.leftMax) * 1000) / 1000
+                  const diff = Math.round((t.rightRms - t.leftRms) * 1000) / 1000
                   return <>
                     <span style={{color}}>{label}</span>
                     {` (${t.min} – ${t.max})`}
-                    {' '}<span style={{color: '#888'}}>L:{t.leftMax} R:{t.rightMax} ({diff >= 0 ? '+' : ''}{diff})</span>
+                    {' '}<span style={{color: '#888'}}>L:{t.leftRms} R:{t.rightRms} ({diff >= 0 ? '+' : ''}{diff})</span>
                     {' '}<span style={{color: '#0ff', fontWeight: 'bold'}}>VIBRATE</span>
                   </>
                 })()}
