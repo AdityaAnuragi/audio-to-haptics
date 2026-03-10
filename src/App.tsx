@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import {useEffect, useMemo, useRef, useState} from 'react'
 import './App.css'
-import { analyzeAudio, type AnalysisResult } from './audio/analyzeAudio'
+import {analyzeAudio, type AnalysisResult} from './audio/analyzeAudio'
 
 interface Trend {
   startIndex: number
@@ -50,7 +50,7 @@ function computeTrends(data: Float32Array, sampleRate: number, bucketSize = 4410
       last.endIndex = end - 1
       last.endTime = endTime
     } else {
-      trends.push({ startIndex: i, endIndex: end - 1, startTime, endTime, min, max, leftMax, rightMax })
+      trends.push({startIndex: i, endIndex: end - 1, startTime, endTime, min, max, leftMax, rightMax})
     }
   }
 
@@ -59,7 +59,11 @@ function computeTrends(data: Float32Array, sampleRate: number, bucketSize = 4410
 
 function shouldVibrate(t: Trend): boolean {
   const diff = t.rightMax - t.leftMax
-  return (t.max >= 0.5) && (diff >= -0.1 && diff <= 0)
+  const threshold = 0.5
+  const lowerBound = -0.4
+  const upperBound = 0.02
+  return (t.max >= threshold) && (diff >= lowerBound && diff <= upperBound)
+  // return (t.max >= 0.5) && (diff < 0.1)
 }
 
 function trendsToVibrationPattern(trends: Trend[]): number[] {
@@ -75,13 +79,13 @@ function trendsToVibrationPattern(trends: Trend[]): number[] {
     if (last && last.vibrate === vibrate) {
       last.ms += ms
     } else {
-      segments.push({ vibrate, ms })
+      segments.push({vibrate, ms})
     }
   }
 
   // Vibration API pattern starts with vibrate — if first segment is a pause, prepend 0
   if (segments.length > 0 && !segments[0].vibrate) {
-    segments.unshift({ vibrate: true, ms: 0 })
+    segments.unshift({vibrate: true, ms: 0})
   }
 
   return segments.map((s) => s.ms)
@@ -102,25 +106,22 @@ function trendsToVibrationPattern(trends: Trend[]): number[] {
 // https://cdn.pixabay.com/audio/2022/03/15/audio_f683707390.mp3 (chainsaw, )
 // https://cdn.pixabay.com/audio/2022/03/10/audio_d5bb26c341.mp3 (chainsaw, quite weak)
 // https://cdn.pixabay.com/audio/2022/12/06/audio_e25cf45a1c.mp3 (chainsaw, this is also really really good)
-// https://cdn.pixabay.com/audio/2022/11/05/audio_997c8fe344.mp3 (beep beep I'm a sheep)
+// https://cdn.pixabay.com/audio/2022/11/05/audio_997c8fe344.mp3 (beep beep I'm a sheep, this is perfect with const threshold = 0.5 const lowerBound = -0.4 const upperBound = 0.05 )
 // https://cdn.pixabay.com/audio/2022/03/15/audio_045f46ad75.mp3 (bike passing by)
 // https://cdn.pixabay.com/audio/2022/03/10/audio_62476ec2db.mp3 (bike firing, utterfail this one)
 // https://cdn.pixabay.com/audio/2025/05/07/audio_208fe5a4c3.mp3 (bike rev)
 // https://cdn.pixabay.com/audio/2022/03/10/audio_6bb0a8df69.mp3
-// https://cdn.pixabay.com/audio/2024/12/03/audio_731302cf58.mp3 (bike taking off, this is also really good)
-// https://cdn.pixabay.com/audio/2024/01/24/audio_23938106b7.mp3 (bike, good)
+// https://cdn.pixabay.com/audio/2024/12/03/audio_731302cf58.mp3 (bike taking off, now it's bad with new algo)
+// https://cdn.pixabay.com/audio/2024/01/24/audio_23938106b7.mp3 (bike, good, const threshold = 0.5 const lowerBound = -0.4 const upperBound = 0.02)
 // https://cdn.pixabay.com/audio/2026/02/25/audio_44dfed5596.mp3 (car engine, bad)
 // https://cdn.pixabay.com/audio/2024/10/27/audio_c331d77d7e.mp3 (swords, eh)
 
 
-
-
-
 function classifyLoudness(max: number): { label: string; color: string } {
-  if (max === 0) return { label: 'silence', color: '#666' }
-  if (max < 0.3) return { label: 'quiet', color: '#6b9' }
-  if (max < 0.7) return { label: 'loud', color: '#db6' }
-  return { label: 'very loud', color: '#f66' }
+  if (max === 0) return {label: 'silence', color: '#666'}
+  if (max < 0.3) return {label: 'quiet', color: '#6b9'}
+  if (max < 0.7) return {label: 'loud', color: '#db6'}
+  return {label: 'very loud', color: '#f66'}
 }
 
 function App() {
@@ -171,20 +172,20 @@ function App() {
     <div>
       <h1>Audio to Haptics</h1>
 
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+      <div style={{display: 'flex', gap: '8px', marginBottom: '16px'}}>
         <input
           type="text"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="Audio URL"
-          style={{ flex: 1, padding: '8px', fontSize: '14px' }}
+          style={{flex: 1, padding: '8px', fontSize: '14px'}}
         />
         <button onClick={handleAnalyze} disabled={loading || !url}>
           {loading ? 'Analyzing...' : 'Analyze'}
         </button>
       </div>
 
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+      <div style={{display: 'flex', gap: '8px', marginBottom: '16px'}}>
         <button
           onClick={() => {
             if (playing) {
@@ -194,7 +195,10 @@ function App() {
               setPlaying(false)
             } else {
               const audio = new Audio(url)
-              audio.onended = () => { navigator.vibrate(0); setPlaying(false) }
+              audio.onended = () => {
+                navigator.vibrate(0);
+                setPlaying(false)
+              }
               audio.play()
               audioRef.current = audio
               setPlaying(true)
@@ -213,7 +217,10 @@ function App() {
               setPlaying(false)
             } else {
               const audio = new Audio(url)
-              audio.onended = () => { navigator.vibrate(0); setPlaying(false) }
+              audio.onended = () => {
+                navigator.vibrate(0);
+                setPlaying(false)
+              }
               audio.play()
               navigator.vibrate(pattern)
               audioRef.current = audio
@@ -224,29 +231,29 @@ function App() {
         >
           {playing ? 'Stop' : 'Play + Vibrate'}
         </button>
-        {playing && <span style={{ fontFamily: 'monospace', fontSize: '16px', alignSelf: 'center' }}>
+        {playing && <span style={{fontFamily: 'monospace', fontSize: '16px', alignSelf: 'center'}}>
           {(elapsed / 1000).toFixed(3)}s
         </span>}
       </div>
 
-      {error && <p style={{ color: '#ff6b6b' }}>Error: {error}</p>}
+      {error && <p style={{color: '#ff6b6b'}}>Error: {error}</p>}
 
-      {result && <ResultView result={result} trends={trends} pattern={pattern} />}
+      {result && <ResultView result={result} trends={trends} pattern={pattern}/>}
     </div>
   )
 }
 
-function ResultView({ result, trends, pattern }: { result: AnalysisResult; trends: Trend[]; pattern: number[] }) {
+function ResultView({result, trends, pattern}: { result: AnalysisResult; trends: Trend[]; pattern: number[] }) {
   return (
-    <div style={{ textAlign: 'left' }}>
+    <div style={{textAlign: 'left'}}>
       <h2>Result</h2>
       <button onClick={() => navigator.vibrate(pattern)}>
         Vibrate
       </button>
-      <button onClick={() => navigator.vibrate(0)} style={{ marginLeft: '8px' }}>
+      <button onClick={() => navigator.vibrate(0)} style={{marginLeft: '8px'}}>
         Stop Vibration
       </button>
-      <p style={{ fontSize: '12px', color: '#888' }}>
+      <p style={{fontSize: '12px', color: '#888'}}>
         Pattern: [{pattern.join(', ')}] ({pattern.length} entries)
       </p>
       <p>Sample Rate: {result.sampleRate} Hz</p>
@@ -255,26 +262,32 @@ function ResultView({ result, trends, pattern }: { result: AnalysisResult; trend
       <p>Total Samples: {result.channelData.length.toLocaleString()}</p>
 
       <h3>Trends (absolute values)</h3>
-      <div style={{ maxHeight: '400px', overflow: 'auto', fontSize: '13px', fontFamily: 'monospace' }}>
-        {trends.filter(shouldVibrate).map((t, i) => (
-          <div key={i} style={{ padding: '2px 0' }}>
-            {t.startTime.toFixed(2)}s – {t.endTime.toFixed(2)}s{' '}
-            <span style={{ color: '#888' }}>
+      {(() => {
+        const vibrateTrends = trends.filter(shouldVibrate)
+        return <>
+          <p style={{fontSize: '12px', color: '#888'}}>{vibrateTrends.length} vibrate-worthy trends</p>
+          <div style={{maxHeight: '400px', overflow: 'auto', fontSize: '13px', fontFamily: 'monospace'}}>
+            {vibrateTrends.map((t, i) => (
+              <div key={i} style={{padding: '2px 0'}}>
+                {t.startTime.toFixed(2)}s – {t.endTime.toFixed(2)}s{' '}
+                <span style={{color: '#888'}}>
               [{t.startIndex.toLocaleString()} – {t.endIndex.toLocaleString()}]
             </span>{' '}
-            {(() => {
-              const { label, color } = classifyLoudness(t.max)
-              const diff = Math.round((t.rightMax - t.leftMax) * 1000) / 1000
-              return <>
-                <span style={{ color }}>{label}</span>
-                {` (${t.min} – ${t.max})`}
-                {' '}<span style={{ color: '#888' }}>L:{t.leftMax} R:{t.rightMax} ({diff >= 0 ? '+' : ''}{diff})</span>
-                {' '}<span style={{ color: '#0ff', fontWeight: 'bold' }}>VIBRATE</span>
-              </>
-            })()}
+                {(() => {
+                  const {label, color} = classifyLoudness(t.max)
+                  const diff = Math.round((t.rightMax - t.leftMax) * 1000) / 1000
+                  return <>
+                    <span style={{color}}>{label}</span>
+                    {` (${t.min} – ${t.max})`}
+                    {' '}<span style={{color: '#888'}}>L:{t.leftMax} R:{t.rightMax} ({diff >= 0 ? '+' : ''}{diff})</span>
+                    {' '}<span style={{color: '#0ff', fontWeight: 'bold'}}>VIBRATE</span>
+                  </>
+                })()}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      })()}
     </div>
   )
 }
