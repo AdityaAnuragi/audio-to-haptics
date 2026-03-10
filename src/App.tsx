@@ -58,7 +58,8 @@ function computeTrends(data: Float32Array, sampleRate: number, bucketSize = 4410
 }
 
 function shouldVibrate(t: Trend): boolean {
-  return (t.max >= 0.5) && ((t.rightMax - t.leftMax) < 0.1)
+  const diff = t.rightMax - t.leftMax
+  return (t.max >= 0.5) && (diff >= -0.1 && diff <= 0)
 }
 
 function trendsToVibrationPattern(trends: Trend[]): number[] {
@@ -123,7 +124,7 @@ function classifyLoudness(max: number): { label: string; color: string } {
 }
 
 function App() {
-  const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2024/01/24/audio_23938106b7.mp3')
+  const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2022/11/05/audio_997c8fe344.mp3')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<AnalysisResult | null>(null)
