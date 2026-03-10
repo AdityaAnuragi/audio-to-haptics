@@ -110,7 +110,7 @@ function trendsToVibrationPattern(trends: Trend[]): number[] {
 // https://cdn.pixabay.com/audio/2024/06/19/audio_68b1203fa2.mp3 (chainsaw, best eg)
 // https://cdn.pixabay.com/audio/2022/03/15/audio_f683707390.mp3 (chainsaw, )
 // https://cdn.pixabay.com/audio/2022/03/10/audio_d5bb26c341.mp3 (chainsaw, quite weak)
-// https://cdn.pixabay.com/audio/2022/12/06/audio_e25cf45a1c.mp3 (chainsaw, this is also really really good)
+// https://cdn.pixabay.com/audio/2022/12/06/audio_e25cf45a1c.mp3 (chainsaw, this is also really really good const threshold = 0.5 const lowerBound = -0.3 const upperBound = 0.02)
 // https://cdn.pixabay.com/audio/2022/11/05/audio_997c8fe344.mp3 (beep beep I'm a sheep, this is perfect with const threshold = 0.5 const lowerBound = -0.4 const upperBound = 0.05 )
 // https://cdn.pixabay.com/audio/2022/03/15/audio_045f46ad75.mp3 (bike passing by)
 // https://cdn.pixabay.com/audio/2022/03/10/audio_62476ec2db.mp3 (bike firing, utterfail this one)
