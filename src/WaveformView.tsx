@@ -8,6 +8,7 @@ interface WaveformViewProps {
   trends: Trend[]
   playing: boolean
   elapsed: number // ms since playback started
+  audioEl: HTMLAudioElement | null
 }
 
 const WINDOW_SAMPLES = 44100 // 1 second at 44100Hz
@@ -16,9 +17,10 @@ const WINDOW_SAMPLES = 44100 // 1 second at 44100Hz
 const PAD_LEFT_PCT = 45 / 800 * 100  // 5.625%
 const PAD_RIGHT_PCT = 10 / 800 * 100 // 1.25%
 
-export default function WaveformView({channelData, sampleRate, trends, playing, elapsed}: WaveformViewProps) {
+export default function WaveformView({channelData, sampleRate, trends, playing, elapsed, audioEl}: WaveformViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [offset, setOffset] = useState(0)
+  const [actualSound, setActualSound] = useState(false)
 
   const maxOffset = Math.max(0, channelData.length - WINDOW_SAMPLES)
   const stepSize = Math.floor(WINDOW_SAMPLES / 2)
@@ -43,6 +45,30 @@ export default function WaveformView({channelData, sampleRate, trends, playing, 
   useEffect(() => {
     if (!playing) setOffset(0)
   }, [playing])
+
+  // Poll actual audio element's currentTime for real sound detection
+  useEffect(() => {
+    if (!audioEl || !playing) {
+      setActualSound(false)
+      return
+    }
+    let raf = 0
+    const poll = () => {
+      const t = audioEl.currentTime
+      const sampleIdx = Math.floor(t * sampleRate)
+      // Check a small window around current playback position
+      const windowSize = 256
+      let maxVal = 0
+      for (let i = sampleIdx; i < Math.min(sampleIdx + windowSize, channelData.length); i++) {
+        const v = Math.abs(channelData[i])
+        if (v > maxVal) maxVal = v
+      }
+      setActualSound(maxVal > 0.01)
+      raf = requestAnimationFrame(poll)
+    }
+    raf = requestAnimationFrame(poll)
+    return () => cancelAnimationFrame(raf)
+  }, [audioEl, playing, channelData, sampleRate])
 
   // Playhead position as percentage within the plot area (0-100)
   const inWindow = playing && currentSample >= offset && currentSample < windowEnd
@@ -212,34 +238,49 @@ export default function WaveformView({channelData, sampleRate, trends, playing, 
           {Math.round(offset / channelData.length * 100)}% through audio
         </span>
       </div>
-      {playing && <div style={{display: 'flex', gap: '8px', marginTop: '8px'}}>
+      {playing && <>
+        <div style={{display: 'flex', gap: '8px', marginTop: '8px'}}>
+          <div style={{
+            flex: 1,
+            padding: '6px 12px',
+            background: isLoud ? '#0ff' : '#333',
+            color: isLoud ? '#000' : '#666',
+            fontFamily: 'monospace',
+            fontSize: '14px',
+            fontWeight: 'bold',
+            textAlign: 'center',
+            borderRadius: '4px',
+          }}>
+            {isLoud ? 'SOUND' : 'silence'}
+          </div>
+          <div style={{
+            flex: 1,
+            padding: '6px 12px',
+            background: isVibrating ? '#0ff' : '#333',
+            color: isVibrating ? '#000' : '#666',
+            fontFamily: 'monospace',
+            fontSize: '14px',
+            fontWeight: 'bold',
+            textAlign: 'center',
+            borderRadius: '4px',
+          }}>
+            {isVibrating ? 'VIBRATING' : 'no vibration'}
+          </div>
+        </div>
         <div style={{
-          flex: 1,
+          marginTop: '8px',
           padding: '6px 12px',
-          background: isLoud ? '#0ff' : '#333',
-          color: isLoud ? '#000' : '#666',
+          background: actualSound ? '#0ff' : '#333',
+          color: actualSound ? '#000' : '#666',
           fontFamily: 'monospace',
           fontSize: '14px',
           fontWeight: 'bold',
           textAlign: 'center',
           borderRadius: '4px',
         }}>
-          {isLoud ? 'SOUND' : 'silence'}
+          {actualSound ? 'ACTUAL SOUND' : 'actual silence'}
         </div>
-        <div style={{
-          flex: 1,
-          padding: '6px 12px',
-          background: isVibrating ? '#0ff' : '#333',
-          color: isVibrating ? '#000' : '#666',
-          fontFamily: 'monospace',
-          fontSize: '14px',
-          fontWeight: 'bold',
-          textAlign: 'center',
-          borderRadius: '4px',
-        }}>
-          {isVibrating ? 'VIBRATING' : 'no vibration'}
-        </div>
-      </div>}
+      </>}
     </div>
   )
 }

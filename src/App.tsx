@@ -132,7 +132,7 @@ function classifyLoudness(max: number): { label: string; color: string } {
 }
 
 function App() {
-  const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2022/12/06/audio_e25cf45a1c.mp3')
+  const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2022/11/05/audio_997c8fe344.mp3')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<AnalysisResult | null>(null)
@@ -246,7 +246,7 @@ function App() {
       {error && <p style={{color: '#ff6b6b'}}>Error: {error}</p>}
 
       {result && <>
-        <WaveformView channelData={result.channelData} sampleRate={result.sampleRate} trends={trends} playing={playing} elapsed={elapsed}/>
+        <WaveformView channelData={result.channelData} sampleRate={result.sampleRate} trends={trends} playing={playing} elapsed={elapsed} audioEl={audioRef.current}/>
         <ResultView result={result} trends={trends} pattern={pattern}/>
       </>}
     </div>
