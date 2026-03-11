@@ -1,20 +1,7 @@
 import {useEffect, useMemo, useRef, useState} from 'react'
 import './App.css'
-import {analyzeAudio, type AnalysisResult} from './audio/analyzeAudio'
+import {analyzeAudio, type AnalysisResult, type Trend, BUCKET_SIZE, shouldVibrate} from './audio/analyzeAudio'
 import WaveformView from './WaveformView'
-
-export interface Trend {
-  startIndex: number
-  endIndex: number
-  startTime: number
-  endTime: number
-  min: number
-  max: number
-  leftRms: number
-  rightRms: number
-}
-
-export const BUCKET_SIZE = 4410 * 0.6
 
 function computeTrends(data: Float32Array, sampleRate: number, bucketSize = BUCKET_SIZE): Trend[] {
   const trends: Trend[] = []
@@ -56,16 +43,6 @@ function computeTrends(data: Float32Array, sampleRate: number, bucketSize = BUCK
   }
 
   return trends
-}
-
-export const VIBRATE_THRESHOLD = 0.5
-
-export function shouldVibrate(t: Trend): boolean {
-  const diff = t.rightRms - t.leftRms
-  const lowerBound = -0.3
-  const upperBound = 0.05
-  return (t.max >= VIBRATE_THRESHOLD) && (lowerBound <= diff && diff <= upperBound)
-  // return (t.max >= 0.5) && (diff < 0.1)
 }
 
 function trendsToVibrationPattern(trends: Trend[]): number[] {
@@ -226,7 +203,7 @@ function App() {
                 setVibrateMode(false)
                 setPlaying(false)
               }
-              audio.play()
+              void audio.play()
               audioRef.current = audio
               setPlaying(true)
             }
@@ -250,7 +227,7 @@ function App() {
                 setVibrateMode(false)
                 setPlaying(false)
               }
-              audio.play()
+              void audio.play()
               setVibrateMode(true)
               audioRef.current = audio
               setPlaying(true)

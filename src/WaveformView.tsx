@@ -1,6 +1,5 @@
 import {useRef, useState, useEffect} from 'react'
-import type {Trend} from './App'
-import {shouldVibrate, VIBRATE_THRESHOLD, BUCKET_SIZE} from './App'
+import {type Trend, shouldVibrate, VIBRATE_THRESHOLD, BUCKET_SIZE} from './audio/analyzeAudio'
 
 interface WaveformViewProps {
   channelData: Float32Array
@@ -17,7 +16,7 @@ const WINDOW_SAMPLES = 44100 // 1 second at 44100Hz
 const PAD_LEFT_PCT = 45 / 800 * 100  // 5.625%
 const PAD_RIGHT_PCT = 10 / 800 * 100 // 1.25%
 
-export default function WaveformView({channelData, sampleRate, trends, playing, playbackTime, audioEl}: WaveformViewProps) {
+export default function WaveformView({channelData, sampleRate, trends, playing, playbackTime}: WaveformViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [offset, setOffset] = useState(0)
   const maxOffset = Math.max(0, channelData.length - WINDOW_SAMPLES)
