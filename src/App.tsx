@@ -1,8 +1,9 @@
 import {useEffect, useMemo, useRef, useState} from 'react'
 import './App.css'
 import {analyzeAudio, type AnalysisResult} from './audio/analyzeAudio'
+import WaveformView from './WaveformView'
 
-interface Trend {
+export interface Trend {
   startIndex: number
   endIndex: number
   startTime: number
@@ -62,12 +63,13 @@ function computeTrends(data: Float32Array, sampleRate: number, bucketSize = 4410
   return trends
 }
 
-function shouldVibrate(t: Trend): boolean {
+export const VIBRATE_THRESHOLD = 0.5
+
+export function shouldVibrate(t: Trend): boolean {
   const diff = t.rightRms - t.leftRms
-  const threshold = 0.5
   const lowerBound = -0.3
   const upperBound = 0.02
-  return (t.max >= threshold) && (lowerBound <= diff && diff <= upperBound)
+  return (t.max >= VIBRATE_THRESHOLD) && (lowerBound <= diff && diff <= upperBound)
   // return (t.max >= 0.5) && (diff < 0.1)
 }
 
@@ -130,7 +132,7 @@ function classifyLoudness(max: number): { label: string; color: string } {
 }
 
 function App() {
-  const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2024/12/03/audio_731302cf58.mp3')
+  const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2022/11/05/audio_997c8fe344.mp3')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<AnalysisResult | null>(null)
@@ -243,7 +245,10 @@ function App() {
 
       {error && <p style={{color: '#ff6b6b'}}>Error: {error}</p>}
 
-      {result && <ResultView result={result} trends={trends} pattern={pattern}/>}
+      {result && <>
+        <WaveformView channelData={result.channelData} sampleRate={result.sampleRate} trends={trends} playing={playing} elapsed={elapsed}/>
+        <ResultView result={result} trends={trends} pattern={pattern}/>
+      </>}
     </div>
   )
 }
