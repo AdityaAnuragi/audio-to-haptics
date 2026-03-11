@@ -14,7 +14,9 @@ export interface Trend {
   rightRms: number
 }
 
-function computeTrends(data: Float32Array, sampleRate: number, bucketSize = 4410 * 0.6): Trend[] {
+export const BUCKET_SIZE = 4410 * 0.6
+
+function computeTrends(data: Float32Array, sampleRate: number, bucketSize = BUCKET_SIZE): Trend[] {
   const trends: Trend[] = []
 
   for (let i = 0; i < data.length; i += bucketSize) {
@@ -50,14 +52,7 @@ function computeTrends(data: Float32Array, sampleRate: number, bucketSize = 4410
     const startTime = i / sampleRate
     const endTime = (end - 1) / sampleRate
 
-    const last = trends[trends.length - 1]
-    // merge with previous trend if same range
-    if (last && last.min === min && last.max === max && last.leftRms === leftRms && last.rightRms === rightRms) {
-      last.endIndex = end - 1
-      last.endTime = endTime
-    } else {
-      trends.push({startIndex: i, endIndex: end - 1, startTime, endTime, min, max, leftRms, rightRms})
-    }
+    trends.push({startIndex: i, endIndex: end - 1, startTime, endTime, min, max, leftRms, rightRms})
   }
 
   return trends
@@ -68,7 +63,7 @@ export const VIBRATE_THRESHOLD = 0.5
 export function shouldVibrate(t: Trend): boolean {
   const diff = t.rightRms - t.leftRms
   const lowerBound = -0.3
-  const upperBound = 0.02
+  const upperBound = 0.05
   return (t.max >= VIBRATE_THRESHOLD) && (lowerBound <= diff && diff <= upperBound)
   // return (t.max >= 0.5) && (diff < 0.1)
 }
@@ -137,28 +132,51 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [playing, setPlaying] = useState(false)
-  const [elapsed, setElapsed] = useState(0)
+  const [playbackTime, setPlaybackTime] = useState(0) // seconds, from audioEl.currentTime
+  const [vibrateMode, setVibrateMode] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const startTimeRef = useRef<number>(0)
   const rafRef = useRef<number>(0)
+  const wasVibratingRef = useRef(false)
+
+  const trends = useMemo(() => result ? computeTrends(result.channelData, result.sampleRate) : [], [result])
+  const pattern = useMemo(() => trendsToVibrationPattern(trends), [trends])
 
   useEffect(() => {
     if (playing) {
-      startTimeRef.current = performance.now()
       const tick = () => {
-        setElapsed(performance.now() - startTimeRef.current)
+        const audio = audioRef.current
+        if (audio) {
+          setPlaybackTime(audio.currentTime)
+
+          // RAF-synced vibration: look up trend at current playback position
+          if (vibrateMode && trends.length > 0) {
+            const bucketIndex = Math.floor((audio.currentTime * (result?.sampleRate ?? 44100)) / BUCKET_SIZE)
+            const trend = trends[bucketIndex]
+            const shouldVib = trend ? shouldVibrate(trend) : false
+
+            if (shouldVib) {
+              // fire/re-fire each frame to keep motor going across bucket boundaries
+              navigator.vibrate(Math.round(BUCKET_SIZE / (result?.sampleRate ?? 44100) * 1000))
+              wasVibratingRef.current = true
+            } else if (wasVibratingRef.current) {
+              navigator.vibrate(0)
+              wasVibratingRef.current = false
+            }
+          }
+        }
         rafRef.current = requestAnimationFrame(tick)
       }
       rafRef.current = requestAnimationFrame(tick)
     } else {
       cancelAnimationFrame(rafRef.current)
-      setElapsed(0)
+      setPlaybackTime(0)
+      if (wasVibratingRef.current) {
+        navigator.vibrate(0)
+        wasVibratingRef.current = false
+      }
     }
     return () => cancelAnimationFrame(rafRef.current)
-  }, [playing])
-
-  const trends = useMemo(() => result ? computeTrends(result.channelData, result.sampleRate) : [], [result])
-  const pattern = useMemo(() => trendsToVibrationPattern(trends), [trends])
+  }, [playing, vibrateMode, trends, result])
 
   const handleAnalyze = async () => {
     setLoading(true)
@@ -199,11 +217,13 @@ function App() {
               audioRef.current?.pause()
               audioRef.current = null
               navigator.vibrate(0)
+              setVibrateMode(false)
               setPlaying(false)
             } else {
               const audio = new Audio(url)
               audio.onended = () => {
                 navigator.vibrate(0);
+                setVibrateMode(false)
                 setPlaying(false)
               }
               audio.play()
@@ -221,32 +241,34 @@ function App() {
               audioRef.current?.pause()
               audioRef.current = null
               navigator.vibrate(0)
+              setVibrateMode(false)
               setPlaying(false)
             } else {
               const audio = new Audio(url)
               audio.onended = () => {
                 navigator.vibrate(0);
+                setVibrateMode(false)
                 setPlaying(false)
               }
               audio.play()
-              navigator.vibrate(pattern)
+              setVibrateMode(true)
               audioRef.current = audio
               setPlaying(true)
             }
           }}
-          disabled={!url || pattern.length === 0}
+          disabled={!url || trends.length === 0}
         >
           {playing ? 'Stop' : 'Play + Vibrate'}
         </button>
         {playing && <span style={{fontFamily: 'monospace', fontSize: '16px', alignSelf: 'center'}}>
-          {(elapsed / 1000).toFixed(3)}s
+          {playbackTime.toFixed(3)}s (from audio element)
         </span>}
       </div>
 
       {error && <p style={{color: '#ff6b6b'}}>Error: {error}</p>}
 
       {result && <>
-        <WaveformView channelData={result.channelData} sampleRate={result.sampleRate} trends={trends} playing={playing} elapsed={elapsed} audioEl={audioRef.current}/>
+        <WaveformView channelData={result.channelData} sampleRate={result.sampleRate} trends={trends} playing={playing} playbackTime={playbackTime} audioEl={audioRef.current}/>
         <ResultView result={result} trends={trends} pattern={pattern}/>
       </>}
     </div>

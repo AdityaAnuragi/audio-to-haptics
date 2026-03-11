@@ -1,13 +1,13 @@
 import {useRef, useState, useEffect} from 'react'
 import type {Trend} from './App'
-import {shouldVibrate, VIBRATE_THRESHOLD} from './App'
+import {shouldVibrate, VIBRATE_THRESHOLD, BUCKET_SIZE} from './App'
 
 interface WaveformViewProps {
   channelData: Float32Array
   sampleRate: number
   trends: Trend[]
   playing: boolean
-  elapsed: number // ms since playback started
+  playbackTime: number // seconds, from audioEl.currentTime
   audioEl: HTMLAudioElement | null
 }
 
@@ -17,11 +17,9 @@ const WINDOW_SAMPLES = 44100 // 1 second at 44100Hz
 const PAD_LEFT_PCT = 45 / 800 * 100  // 5.625%
 const PAD_RIGHT_PCT = 10 / 800 * 100 // 1.25%
 
-export default function WaveformView({channelData, sampleRate, trends, playing, elapsed, audioEl}: WaveformViewProps) {
+export default function WaveformView({channelData, sampleRate, trends, playing, playbackTime, audioEl}: WaveformViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [offset, setOffset] = useState(0)
-  const [actualSound, setActualSound] = useState(false)
-
   const maxOffset = Math.max(0, channelData.length - WINDOW_SAMPLES)
   const stepSize = Math.floor(WINDOW_SAMPLES / 2)
   const windowEnd = Math.min(offset + WINDOW_SAMPLES, channelData.length)
@@ -30,8 +28,8 @@ export default function WaveformView({channelData, sampleRate, trends, playing, 
   const endMs = (windowEnd / sampleRate * 1000).toFixed(0)
   const windowMs = ((windowEnd - offset) / sampleRate * 1000).toFixed(0)
 
-  // Current playback sample position
-  const currentSample = (elapsed / 1000) * sampleRate
+  // Current playback sample position (derived from audio element's currentTime)
+  const currentSample = playbackTime * sampleRate
 
   // Auto-advance page when playback passes current window
   useEffect(() => {
@@ -46,37 +44,26 @@ export default function WaveformView({channelData, sampleRate, trends, playing, 
     if (!playing) setOffset(0)
   }, [playing])
 
-  // Poll actual audio element's currentTime for real sound detection
-  useEffect(() => {
-    if (!audioEl || !playing) {
-      setActualSound(false)
-      return
+  // Actual sound detection — now uses same playbackTime from audio element
+  const actualSound = (() => {
+    if (!playing) return false
+    const sampleIdx = Math.floor(playbackTime * sampleRate)
+    const windowSize = 256
+    let maxVal = 0
+    for (let i = sampleIdx; i < Math.min(sampleIdx + windowSize, channelData.length); i++) {
+      const v = Math.abs(channelData[i])
+      if (v > maxVal) maxVal = v
     }
-    let raf = 0
-    const poll = () => {
-      const t = audioEl.currentTime
-      const sampleIdx = Math.floor(t * sampleRate)
-      // Check a small window around current playback position
-      const windowSize = 256
-      let maxVal = 0
-      for (let i = sampleIdx; i < Math.min(sampleIdx + windowSize, channelData.length); i++) {
-        const v = Math.abs(channelData[i])
-        if (v > maxVal) maxVal = v
-      }
-      setActualSound(maxVal > 0.01)
-      raf = requestAnimationFrame(poll)
-    }
-    raf = requestAnimationFrame(poll)
-    return () => cancelAnimationFrame(raf)
-  }, [audioEl, playing, channelData, sampleRate])
+    return maxVal > 0.01
+  })()
 
   // Playhead position as percentage within the plot area (0-100)
   const inWindow = playing && currentSample >= offset && currentSample < windowEnd
   const playheadPct = inWindow ? ((currentSample - offset) / windowLen) * 100 : 0
 
-  // Current trend at playhead
+  // Current trend at playhead (direct index access — 1:1 bucket-to-trend mapping)
   const currentTrend = playing
-    ? trends.find(t => currentSample >= t.startIndex && currentSample <= t.endIndex)
+    ? trends[Math.floor(currentSample / BUCKET_SIZE)]
     : undefined
   const isVibrating = currentTrend ? shouldVibrate(currentTrend) : false
   const isLoud = currentTrend ? currentTrend.max > 0 : false
