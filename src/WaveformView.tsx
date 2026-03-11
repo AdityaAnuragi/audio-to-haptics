@@ -48,6 +48,13 @@ export default function WaveformView({channelData, sampleRate, trends, playing, 
   const inWindow = playing && currentSample >= offset && currentSample < windowEnd
   const playheadPct = inWindow ? ((currentSample - offset) / windowLen) * 100 : 0
 
+  // Current trend at playhead
+  const currentTrend = playing
+    ? trends.find(t => currentSample >= t.startIndex && currentSample <= t.endIndex)
+    : undefined
+  const isVibrating = currentTrend ? shouldVibrate(currentTrend) : false
+  const isLoud = currentTrend ? currentTrend.max > 0 : false
+
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -205,6 +212,34 @@ export default function WaveformView({channelData, sampleRate, trends, playing, 
           {Math.round(offset / channelData.length * 100)}% through audio
         </span>
       </div>
+      {playing && <div style={{display: 'flex', gap: '8px', marginTop: '8px'}}>
+        <div style={{
+          flex: 1,
+          padding: '6px 12px',
+          background: isLoud ? '#0ff' : '#333',
+          color: isLoud ? '#000' : '#666',
+          fontFamily: 'monospace',
+          fontSize: '14px',
+          fontWeight: 'bold',
+          textAlign: 'center',
+          borderRadius: '4px',
+        }}>
+          {isLoud ? 'SOUND' : 'silence'}
+        </div>
+        <div style={{
+          flex: 1,
+          padding: '6px 12px',
+          background: isVibrating ? '#0ff' : '#333',
+          color: isVibrating ? '#000' : '#666',
+          fontFamily: 'monospace',
+          fontSize: '14px',
+          fontWeight: 'bold',
+          textAlign: 'center',
+          borderRadius: '4px',
+        }}>
+          {isVibrating ? 'VIBRATING' : 'no vibration'}
+        </div>
+      </div>}
     </div>
   )
 }
