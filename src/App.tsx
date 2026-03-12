@@ -70,32 +70,33 @@ function trendsToVibrationPattern(trends: Trend[]): number[] {
   return segments.map((s) => s.ms)
 }
 
-// threshold value of 0.3
-// https://cdn.pixabay.com/audio/2022/03/10/audio_888827b659.mp3 (truck)
-
-// threshold value of 0.4
-// https://cdn.pixabay.com/audio/2025/05/27/audio_3331fe5270.mp3 (simple gun)
-// https://cdn.pixabay.com/audio/2025/10/21/audio_92be5a14ad.mp3 (sniper)
-// https://cdn.pixabay.com/audio/2022/03/21/audio_f0e01c4b7a.mp3 (ball bouncing)
-// https://cdn.pixabay.com/audio/2022/03/19/audio_1712057a76.mp3 (hammering a nail, not the best example)
-// https://cdn.pixabay.com/audio/2022/03/10/audio_fecee3808e.mp3 (hammering a nail, a little better)
-
-// threshold value of 0.5
-// https://cdn.pixabay.com/audio/2024/06/19/audio_68b1203fa2.mp3 (chainsaw, best eg)
-// https://cdn.pixabay.com/audio/2022/03/15/audio_f683707390.mp3 (chainsaw, )
-// https://cdn.pixabay.com/audio/2022/03/10/audio_d5bb26c341.mp3 (chainsaw, quite weak)
-// https://cdn.pixabay.com/audio/2022/12/06/audio_e25cf45a1c.mp3 (chainsaw, this is also really really good const threshold = 0.5 const lowerBound = -0.3 const upperBound = 0.02, bucket size = 4410 * 0.6 or 60ms)
-// https://cdn.pixabay.com/audio/2022/11/05/audio_997c8fe344.mp3 (beep beep I'm a sheep, this is perfect with const threshold = 0.5 const lowerBound = -0.4 const upperBound = 0.05 )
-// https://cdn.pixabay.com/audio/2022/03/15/audio_045f46ad75.mp3 (bike passing by)
-// https://cdn.pixabay.com/audio/2022/03/10/audio_62476ec2db.mp3 (bike firing, utterfail this one)
-// https://cdn.pixabay.com/audio/2025/05/07/audio_208fe5a4c3.mp3 (bike rev)
-// https://cdn.pixabay.com/audio/2022/03/10/audio_6bb0a8df69.mp3
-// https://cdn.pixabay.com/audio/2024/12/03/audio_731302cf58.mp3 (bike taking off)
-// https://cdn.pixabay.com/audio/2024/01/24/audio_23938106b7.mp3 (bike, good, const threshold = 0.5 const lowerBound = -0.4 const upperBound = 0.02)
-// https://cdn.pixabay.com/audio/2026/02/25/audio_44dfed5596.mp3 (car engine, bad)
-// https://cdn.pixabay.com/audio/2024/10/27/audio_c331d77d7e.mp3 (swords, eh)
-// https://cdn.pixabay.com/audio/2022/03/15/audio_2335b3b43a.mp3 (more beeps)
-// https://cdn.pixabay.com/audio/2022/11/04/audio_9ff1118f72.mp3 (more beeps)
+const TEST_AUDIOS = [
+  // favorites
+  {url: 'https://cdn.pixabay.com/audio/2022/11/05/audio_997c8fe344.mp3', label: 'Beep beep (0.5, perfect)'},
+  {url: 'https://cdn.pixabay.com/audio/2025/05/07/audio_208fe5a4c3.mp3', label: 'Bike rev (0.5)'},
+  {url: 'https://cdn.pixabay.com/audio/2022/12/06/audio_e25cf45a1c.mp3', label: 'Chainsaw (0.5, really good)'},
+  // threshold 0.3
+  {url: 'https://cdn.pixabay.com/audio/2022/03/10/audio_888827b659.mp3', label: 'Truck (0.3)'},
+  // threshold 0.4
+  {url: 'https://cdn.pixabay.com/audio/2025/05/27/audio_3331fe5270.mp3', label: 'Simple gun (0.4)'},
+  {url: 'https://cdn.pixabay.com/audio/2025/10/21/audio_92be5a14ad.mp3', label: 'Sniper (0.4)'},
+  {url: 'https://cdn.pixabay.com/audio/2022/03/21/audio_f0e01c4b7a.mp3', label: 'Ball bouncing (0.4)'},
+  {url: 'https://cdn.pixabay.com/audio/2022/03/19/audio_1712057a76.mp3', label: 'Hammering nail (0.4, not great)'},
+  {url: 'https://cdn.pixabay.com/audio/2022/03/10/audio_fecee3808e.mp3', label: 'Hammering nail (0.4, better)'},
+  // threshold 0.5
+  {url: 'https://cdn.pixabay.com/audio/2024/06/19/audio_68b1203fa2.mp3', label: 'Chainsaw (0.5, best)'},
+  {url: 'https://cdn.pixabay.com/audio/2022/03/15/audio_f683707390.mp3', label: 'Chainsaw (0.5)'},
+  {url: 'https://cdn.pixabay.com/audio/2022/03/10/audio_d5bb26c341.mp3', label: 'Chainsaw (0.5, weak)'},
+  {url: 'https://cdn.pixabay.com/audio/2022/03/15/audio_045f46ad75.mp3', label: 'Bike passing by (0.5)'},
+  {url: 'https://cdn.pixabay.com/audio/2022/03/10/audio_62476ec2db.mp3', label: 'Bike firing (0.5, fail)'},
+  {url: 'https://cdn.pixabay.com/audio/2022/03/10/audio_6bb0a8df69.mp3', label: 'Unknown (0.5)'},
+  {url: 'https://cdn.pixabay.com/audio/2024/12/03/audio_731302cf58.mp3', label: 'Bike taking off (0.5)'},
+  {url: 'https://cdn.pixabay.com/audio/2024/01/24/audio_23938106b7.mp3', label: 'Bike (0.5, good)'},
+  {url: 'https://cdn.pixabay.com/audio/2026/02/25/audio_44dfed5596.mp3', label: 'Car engine (0.5, bad)'},
+  {url: 'https://cdn.pixabay.com/audio/2024/10/27/audio_c331d77d7e.mp3', label: 'Swords (0.5, eh)'},
+  {url: 'https://cdn.pixabay.com/audio/2022/03/15/audio_2335b3b43a.mp3', label: 'More beeps (0.5)'},
+  {url: 'https://cdn.pixabay.com/audio/2022/11/04/audio_9ff1118f72.mp3', label: 'More beeps 2 (0.5)'},
+]
 
 
 function classifyLoudness(max: number): { label: string; color: string } {
@@ -176,7 +177,37 @@ function App() {
     <div>
       <h1>Audio to Haptics</h1>
 
-      <div style={{display: 'flex', gap: '8px', marginBottom: '16px'}}>
+      <div style={{display: 'flex', gap: '8px', marginBottom: '8px'}}>
+        <select
+          value={TEST_AUDIOS.some(a => a.url === url) ? url : '__custom__'}
+          onChange={(e) => {
+            const val = e.target.value
+            if (val === '__custom__') {
+              setUrl('')
+            } else {
+              setUrl(val)
+            }
+            setResult(null)
+            setError(null)
+            setPlaybackTime(0)
+            if (playing) {
+              audioRef.current?.pause()
+              audioRef.current = null
+              navigator.vibrate(0)
+              setVibrateMode(false)
+              setPlaying(false)
+            }
+          }}
+          style={{flex: 1, padding: '8px', fontSize: '14px'}}
+        >
+          {TEST_AUDIOS.map((a) => <option key={a.url} value={a.url}>{a.label}</option>)}
+          <option value="__custom__">Custom URL...</option>
+        </select>
+        <button onClick={handleAnalyze} disabled={loading || !url}>
+          {loading ? 'Analyzing...' : 'Analyze'}
+        </button>
+      </div>
+      {!TEST_AUDIOS.some(a => a.url === url) && <div style={{display: 'flex', gap: '8px', marginBottom: '16px'}}>
         <input
           type="text"
           value={url}
@@ -184,10 +215,7 @@ function App() {
           placeholder="Audio URL"
           style={{flex: 1, padding: '8px', fontSize: '14px'}}
         />
-        <button onClick={handleAnalyze} disabled={loading || !url}>
-          {loading ? 'Analyzing...' : 'Analyze'}
-        </button>
-      </div>
+      </div>}
 
       <div style={{display: 'flex', gap: '8px', marginBottom: '16px'}}>
         <button
