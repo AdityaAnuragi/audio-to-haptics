@@ -26,12 +26,17 @@ export interface AnalysisResult {
   sampleRate: number
   duration: number
   numberOfChannels: number
+  outputLatency: number
+  baseLatency: number
 }
 
 export async function decodeAudioBuffer(arrayBuffer: ArrayBuffer): Promise<AnalysisResult> {
   const audioContext = new AudioContext()
   const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
   const channelData = audioBuffer.getChannelData(0)
+
+  const outputLatency = audioContext.outputLatency ?? -100
+  const baseLatency = audioContext.baseLatency ?? -100
 
   await audioContext.close()
 
@@ -40,6 +45,8 @@ export async function decodeAudioBuffer(arrayBuffer: ArrayBuffer): Promise<Analy
     sampleRate: audioBuffer.sampleRate,
     duration: audioBuffer.duration,
     numberOfChannels: audioBuffer.numberOfChannels,
+    outputLatency,
+    baseLatency,
   }
 }
 

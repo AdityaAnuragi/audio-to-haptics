@@ -215,7 +215,7 @@ function App() {
           {playing ? 'Stop' : 'Play'}
         </button>
         <button
-          onClick={() => {
+          onClick={async () => {
             if (playing) {
               audioRef.current?.pause()
               audioRef.current = null
@@ -229,7 +229,7 @@ function App() {
                 setVibrateMode(false)
                 setPlaying(false)
               }
-              void audio.play()
+              await audio.play() // wait for playback to actually begin before starting RAF loop
               setVibrateMode(true)
               audioRef.current = audio
               setPlaying(true)
@@ -271,6 +271,8 @@ function ResultView({result, trends, pattern}: { result: AnalysisResult; trends:
       <p>Duration: {result.duration.toFixed(2)}s</p>
       <p>Channels: {result.numberOfChannels}</p>
       <p>Total Samples: {result.channelData.length.toLocaleString()}</p>
+      <p>Output Latency: {result.outputLatency}s ({Math.round(result.outputLatency * 1000)}ms)</p>
+      <p>Base Latency: {result.baseLatency}s ({Math.round(result.baseLatency * 1000)}ms)</p>
 
       <h3>Trends (absolute values)</h3>
       {(() => {
