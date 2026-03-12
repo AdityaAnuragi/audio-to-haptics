@@ -94,6 +94,8 @@ function trendsToVibrationPattern(trends: Trend[]): number[] {
 // https://cdn.pixabay.com/audio/2024/01/24/audio_23938106b7.mp3 (bike, good, const threshold = 0.5 const lowerBound = -0.4 const upperBound = 0.02)
 // https://cdn.pixabay.com/audio/2026/02/25/audio_44dfed5596.mp3 (car engine, bad)
 // https://cdn.pixabay.com/audio/2024/10/27/audio_c331d77d7e.mp3 (swords, eh)
+// https://cdn.pixabay.com/audio/2022/03/15/audio_2335b3b43a.mp3 (more beeps)
+// https://cdn.pixabay.com/audio/2022/11/04/audio_9ff1118f72.mp3 (more beeps)
 
 
 function classifyLoudness(max: number): { label: string; color: string } {
