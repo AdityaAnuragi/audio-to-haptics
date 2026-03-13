@@ -48,6 +48,14 @@ function App() {
   const trends = useMemo(() => result ? computeTrends(result.channelData, result.sampleRate) : [], [result])
   const pattern = useMemo(() => trendsToVibrationPattern(trends), [trends])
 
+  // uncomment to log trends/vibrationPattern for test fixtures
+  // useEffect(() => {
+  //   if (trends.length > 0) {
+  //     console.log('trends:', JSON.stringify(trends))
+  //     console.log('vibrationPattern:', JSON.stringify(pattern))
+  //   }
+  // }, [trends, pattern])
+
   useEffect(() => {
     if (playing) {
       const tick = () => {
