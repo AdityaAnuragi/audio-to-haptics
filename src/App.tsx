@@ -46,6 +46,7 @@ function App() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const rafRef = useRef<number>(0)
   const wasVibratingRef = useRef(false)
+  const lastInterruptionRef = useRef(0)
 
   const trends = useMemo(() => result ? computeTrends(result.channelData, result.sampleRate) : [], [result])
   const pattern = useMemo(() => trendsToVibrationPattern(trends), [trends])
@@ -66,7 +67,10 @@ function App() {
           setPlaybackTime(audio.currentTime)
 
           // RAF-synced vibration: look up trend at current playback position
-          if (vibrateMode && trends.length > 0) {
+          // Mute window: suppress haptics during audio pipeline warmup
+          const muteWindowMs = ((result?.outputLatency ?? 0) + (result?.baseLatency ?? 0)) * 1000
+          const inMuteWindow = performance.now() - lastInterruptionRef.current < muteWindowMs
+          if (vibrateMode && trends.length > 0 && !inMuteWindow) {
             const bucketIndex = Math.floor((audio.currentTime * (result?.sampleRate ?? 44100)) / BUCKET_SIZE)
             const trend = trends[bucketIndex]
             const shouldVib = trend ? shouldVibrate(trend) : false
@@ -195,6 +199,7 @@ function App() {
                 setPlaying(false)
               }
               await audio.play() // wait for playback to actually begin before starting RAF loop
+              lastInterruptionRef.current = performance.now()
               setVibrateMode(true)
               audioRef.current = audio
               setPlaying(true)
