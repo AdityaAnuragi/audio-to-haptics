@@ -107,8 +107,8 @@ export async function decodeAudioBuffer(arrayBuffer: ArrayBuffer): Promise<Analy
   const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
   const channelData = audioBuffer.getChannelData(0)
 
-  const outputLatency = audioContext.outputLatency ?? -100
-  const baseLatency = audioContext.baseLatency ?? -100
+  const outputLatency = audioContext.outputLatency ?? 0
+  const baseLatency = audioContext.baseLatency ?? 0
 
   await audioContext.close()
 
