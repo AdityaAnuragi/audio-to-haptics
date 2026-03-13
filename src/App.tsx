@@ -7,7 +7,8 @@ import WaveformView from './WaveformView'
 const TEST_AUDIOS = [
   // favorites
   {url: 'https://cdn.pixabay.com/audio/2022/11/05/audio_997c8fe344.mp3', label: 'Beep beep (0.5, perfect)'},
-  {url: 'https://cdn.pixabay.com/audio/2025/05/07/audio_208fe5a4c3.mp3', label: 'Bike rev (0.5)'},
+  {url: 'https://cdn.pixabay.com/audio/2024/01/24/audio_23938106b7.mp3', label: 'Bike (0.5, good)'},
+  // {url: 'https://cdn.pixabay.com/audio/2025/05/07/audio_208fe5a4c3.mp3', label: 'Bike rev (0.5)'},
   {url: 'https://cdn.pixabay.com/audio/2022/12/06/audio_e25cf45a1c.mp3', label: 'Chainsaw (0.5, really good)'},
   // threshold 0.3
   {url: 'https://cdn.pixabay.com/audio/2022/03/10/audio_888827b659.mp3', label: 'Truck (0.3)'},
@@ -25,7 +26,8 @@ const TEST_AUDIOS = [
   {url: 'https://cdn.pixabay.com/audio/2022/03/10/audio_62476ec2db.mp3', label: 'Bike firing (0.5, fail)'},
   {url: 'https://cdn.pixabay.com/audio/2022/03/10/audio_6bb0a8df69.mp3', label: 'Unknown (0.5)'},
   {url: 'https://cdn.pixabay.com/audio/2024/12/03/audio_731302cf58.mp3', label: 'Bike taking off (0.5)'},
-  {url: 'https://cdn.pixabay.com/audio/2024/01/24/audio_23938106b7.mp3', label: 'Bike (0.5, good)'},
+  // {url: 'https://cdn.pixabay.com/audio/2024/01/24/audio_23938106b7.mp3', label: 'Bike (0.5, good)'},
+  {url: 'https://cdn.pixabay.com/audio/2025/05/07/audio_208fe5a4c3.mp3', label: 'Bike rev (0.5)'},
   {url: 'https://cdn.pixabay.com/audio/2026/02/25/audio_44dfed5596.mp3', label: 'Car engine (0.5, bad)'},
   {url: 'https://cdn.pixabay.com/audio/2024/10/27/audio_c331d77d7e.mp3', label: 'Swords (0.5, eh)'},
   {url: 'https://cdn.pixabay.com/audio/2022/03/15/audio_2335b3b43a.mp3', label: 'More beeps (0.5)'},
