@@ -11,7 +11,7 @@ export interface Trend {
 
 export const BUCKET_SIZE = 4410 * 0.6
 
-export const VIBRATE_THRESHOLD = 0.12
+export const VIBRATE_THRESHOLD = 0.15
 
 export function shouldVibrate(t: Trend): boolean {
   const diff = t.rightRms - t.leftRms
@@ -104,7 +104,7 @@ export interface AnalysisResult {
 }
 
 /** Run audio through a lowpass filter at cutoffHz using OfflineAudioContext → bass-only Float32Array */
-export async function filterToBass(audioBuffer: AudioBuffer, cutoffHz = 250): Promise<Float32Array> {
+export async function filterToBass(audioBuffer: AudioBuffer, cutoffHz = 350): Promise<Float32Array> {
   const offline = new OfflineAudioContext(1, audioBuffer.length, audioBuffer.sampleRate)
   const source = offline.createBufferSource()
   source.buffer = audioBuffer

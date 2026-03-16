@@ -5,6 +5,8 @@ import WaveformView from './WaveformView'
 
 
 const TEST_AUDIOS = [
+  // public folder
+  {url: '/TRIMMED Chippin In.mp3', label: 'TRIMMED Chippin In.mp3' },
   // favorites
   {url: 'https://cdn.pixabay.com/audio/2022/11/05/audio_997c8fe344.mp3', label: 'Beep beep (0.5, perfect)'},
   {url: 'https://cdn.pixabay.com/audio/2024/01/24/audio_23938106b7.mp3', label: 'Bike (0.5, good)'},
