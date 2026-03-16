@@ -1,10 +1,11 @@
 import {useRef, useState, useEffect} from 'react'
-import {type Trend, shouldVibrate, VIBRATE_THRESHOLD, BUCKET_SIZE} from './audio/analyzeAudio'
+import {type Trend, VIBRATE_THRESHOLD, BUCKET_SIZE} from './audio/analyzeAudio'
 
 interface WaveformViewProps {
   channelData: Float32Array
   sampleRate: number
   trends: Trend[]
+  vibrationMap: boolean[]
   playing: boolean
   playbackTime: number // seconds, from audioEl.currentTime
   audioEl: HTMLAudioElement | null
@@ -16,7 +17,7 @@ const WINDOW_SAMPLES = 44100 // 1 second at 44100Hz
 const PAD_LEFT_PCT = 45 / 800 * 100  // 5.625%
 const PAD_RIGHT_PCT = 10 / 800 * 100 // 1.25%
 
-export default function WaveformView({channelData, sampleRate, trends, playing, playbackTime}: WaveformViewProps) {
+export default function WaveformView({channelData, sampleRate, trends, vibrationMap, playing, playbackTime}: WaveformViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [offset, setOffset] = useState(0)
   const maxOffset = Math.max(0, channelData.length - WINDOW_SAMPLES)
@@ -64,7 +65,8 @@ export default function WaveformView({channelData, sampleRate, trends, playing, 
   const currentTrend = playing
     ? trends[Math.floor(currentSample / BUCKET_SIZE)]
     : undefined
-  const isVibrating = currentTrend ? shouldVibrate(currentTrend) : false
+  const currentTrendIndex = playing ? Math.floor(currentSample / BUCKET_SIZE) : -1
+  const isVibrating = currentTrendIndex >= 0 ? (vibrationMap[currentTrendIndex] ?? false) : false
   const isLoud = currentTrend ? currentTrend.max > 0 : false
 
   useEffect(() => {
@@ -84,8 +86,9 @@ export default function WaveformView({channelData, sampleRate, trends, playing, 
     ctx.fillRect(0, 0, width, height)
 
     // Vibration overlay regions
-    for (const t of trends) {
-      if (!shouldVibrate(t)) continue
+    for (let ti = 0; ti < trends.length; ti++) {
+      const t = trends[ti]
+      if (!vibrationMap[ti]) continue
       if (t.endIndex < offset || t.startIndex >= windowEnd) continue
 
       const x1 = pad.left + ((Math.max(t.startIndex, offset) - offset) / windowLen) * plotW
@@ -171,7 +174,7 @@ export default function WaveformView({channelData, sampleRate, trends, playing, 
       ctx.lineTo(x, pad.top + plotH + 4)
       ctx.stroke()
     }
-  }, [channelData, offset, sampleRate, trends, windowEnd, windowLen])
+  }, [channelData, offset, sampleRate, trends, vibrationMap, windowEnd, windowLen])
 
   return (
     <div>

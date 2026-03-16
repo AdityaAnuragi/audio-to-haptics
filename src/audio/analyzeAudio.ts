@@ -11,16 +11,38 @@ export interface Trend {
 
 export const BUCKET_SIZE = 4410 * 0.6
 
-export const VIBRATE_THRESHOLD = 0.15
+export const VIBRATE_THRESHOLD = 0.05 // minimum absolute threshold to ignore noise floor
+export const NEIGHBOR_RADIUS = 5   // look at N buckets on each side (~300ms at 60ms/bucket)
+export const SPIKE_RATIO = 1.5      // must be this much louder than neighbor average
 
-export function shouldVibrate(t: Trend): boolean {
-  const diff = t.rightRms - t.leftRms
-  const lowerBound = -0.09
-  const upperBound = 0.015
-  return (t.max >= VIBRATE_THRESHOLD) && (lowerBound <= diff && diff <= upperBound)
-  // old amplitude settings: threshold 0.5, lowerBound -0.3, upperBound 0.05
-  // bass ≈ 0.3x amplitude, so settings scaled by ~0.3
+// Path B: compare each bucket to its neighbors instead of absolute threshold + RMS diff
+export function computeVibrationMap(trends: Trend[]): boolean[] {
+  return trends.map((t, i) => {
+    if (t.max < VIBRATE_THRESHOLD) return false
+
+    let sum = 0
+    let count = 0
+    for (let j = i - NEIGHBOR_RADIUS; j <= i + NEIGHBOR_RADIUS; j++) {
+      if (j === i || j < 0 || j >= trends.length) continue
+      sum += trends[j].max
+      count++
+    }
+
+    if (count === 0) return true // isolated bucket, no neighbors
+    const neighborAvg = sum / count
+    if (neighborAvg < 0.001) return true // spike from silence
+
+    return t.max / neighborAvg >= SPIKE_RATIO
+  })
 }
+
+// old approach: absolute threshold + RMS left/right diff bounds
+// export function shouldVibrate(t: Trend): boolean {
+//   const diff = t.rightRms - t.leftRms
+//   const lowerBound = -0.09
+//   const upperBound = 0.015
+//   return (t.max >= VIBRATE_THRESHOLD) && (lowerBound <= diff && diff <= upperBound)
+// }
 
 export function computeTrends(data: Float32Array, sampleRate: number, bucketSize = BUCKET_SIZE): Trend[] {
   const trends: Trend[] = []
@@ -64,12 +86,13 @@ export function computeTrends(data: Float32Array, sampleRate: number, bucketSize
   return trends
 }
 
-export function trendsToVibrationPattern(trends: Trend[]): number[] {
+export function trendsToVibrationPattern(trends: Trend[], vibrationMap: boolean[]): number[] {
   const segments: { vibrate: boolean; ms: number }[] = []
 
-  for (const t of trends) {
+  for (let i = 0; i < trends.length; i++) {
+    const t = trends[i]
     const ms = Math.round((t.endTime - t.startTime) * 1000)
-    const vibrate = shouldVibrate(t)
+    const vibrate = vibrationMap[i]
 
     const last = segments[segments.length - 1]
     if (last && last.vibrate === vibrate) {
@@ -124,7 +147,9 @@ export async function filterToBass(audioBuffer: AudioBuffer, cutoffHz = 350): Pr
 export async function decodeAudioBuffer(arrayBuffer: ArrayBuffer): Promise<AnalysisResult> {
   const audioContext = new AudioContext()
   const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
-  const channelData = await filterToBass(audioBuffer)
+  // Path B uses full-spectrum amplitude (no bass filter)
+  const channelData = audioBuffer.getChannelData(0)
+  // const channelData = await filterToBass(audioBuffer)
 
   const outputLatency = audioContext.outputLatency ?? 0
   const baseLatency = audioContext.baseLatency ?? 0
