@@ -13,7 +13,7 @@ export const BUCKET_SIZE = 4410 * 0.6
 
 export const VIBRATE_THRESHOLD = 0.05 // minimum absolute threshold to ignore noise floor
 export const NEIGHBOR_RADIUS = 5   // look at N buckets on each side (~300ms at 60ms/bucket)
-export const SPIKE_RATIO = 1.5      // must be this much louder than neighbor average
+export const SPIKE_RATIO = 1.5      // must be this much louder than neighbor average, default 1.5
 
 // Path B: compare each bucket to its neighbors instead of absolute threshold + RMS diff
 export function computeVibrationMap(trends: Trend[]): boolean[] {

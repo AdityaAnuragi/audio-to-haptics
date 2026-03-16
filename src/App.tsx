@@ -8,6 +8,9 @@ const TEST_AUDIOS = [
   // public folder
   {url: '/TRIMMED Chippin In.mp3', label: 'TRIMMED Chippin In.mp3' },
   {url: '/Chop Suey.mp3', label: 'Chop Suey.mp3' },
+  {url: '/Death Metal Drumming.mp3', label: 'Death Metal (this is really good)' },
+  {url: '/Death Metal Drumming pt.2.mp3', label: 'Death Metal Drumming pt.2.mp3' },
+  {url: '/George Kollias -  Shall Rise Shall Be Dead.mp3', label: 'George Kollias (Spike - 1.4)' },
   // favorites
   {url: 'https://cdn.pixabay.com/audio/2022/11/05/audio_997c8fe344.mp3', label: 'Beep beep (0.5, perfect)'},
   {url: 'https://cdn.pixabay.com/audio/2024/01/24/audio_23938106b7.mp3', label: 'Bike (0.5, good)'},
@@ -100,7 +103,7 @@ function App() {
       }
     }
     return () => cancelAnimationFrame(rafRef.current)
-  }, [playing, vibrateMode, vibrationMap, result])
+  }, [playing, vibrateMode, vibrationMap, result, trends.length])
 
   const handleAnalyze = async () => {
     setLoading(true)
