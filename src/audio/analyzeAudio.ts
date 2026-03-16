@@ -102,10 +102,28 @@ export interface AnalysisResult {
   baseLatency: number
 }
 
+/** Run audio through a lowpass filter at cutoffHz using OfflineAudioContext → bass-only Float32Array */
+export async function filterToBass(audioBuffer: AudioBuffer, cutoffHz = 250): Promise<Float32Array> {
+  const offline = new OfflineAudioContext(1, audioBuffer.length, audioBuffer.sampleRate)
+  const source = offline.createBufferSource()
+  source.buffer = audioBuffer
+
+  const filter = offline.createBiquadFilter()
+  filter.type = 'lowpass'
+  filter.frequency.value = cutoffHz
+
+  source.connect(filter)
+  filter.connect(offline.destination)
+  source.start(0)
+
+  const rendered = await offline.startRendering()
+  return rendered.getChannelData(0)
+}
+
 export async function decodeAudioBuffer(arrayBuffer: ArrayBuffer): Promise<AnalysisResult> {
   const audioContext = new AudioContext()
   const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
-  const channelData = audioBuffer.getChannelData(0)
+  const channelData = await filterToBass(audioBuffer)
 
   const outputLatency = audioContext.outputLatency ?? 0
   const baseLatency = audioContext.baseLatency ?? 0
