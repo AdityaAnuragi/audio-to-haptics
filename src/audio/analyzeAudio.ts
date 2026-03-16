@@ -11,14 +11,15 @@ export interface Trend {
 
 export const BUCKET_SIZE = 4410 * 0.6
 
-export const VIBRATE_THRESHOLD = 0.05
+export const VIBRATE_THRESHOLD = 0.12
 
 export function shouldVibrate(t: Trend): boolean {
   const diff = t.rightRms - t.leftRms
-  const lowerBound = -0.03
-  const upperBound = 0.005
+  const lowerBound = -0.09
+  const upperBound = 0.015
   return (t.max >= VIBRATE_THRESHOLD) && (lowerBound <= diff && diff <= upperBound)
   // old amplitude settings: threshold 0.5, lowerBound -0.3, upperBound 0.05
+  // bass ≈ 0.3x amplitude, so settings scaled by ~0.3
 }
 
 export function computeTrends(data: Float32Array, sampleRate: number, bucketSize = BUCKET_SIZE): Trend[] {
