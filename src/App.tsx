@@ -1,6 +1,6 @@
 import {useEffect, useMemo, useRef, useState} from 'react'
 import './App.css'
-import {analyzeAudio, type AnalysisResult, type Trend, BUCKET_SIZE, computeVibrationMap, computeTrends, trendsToVibrationPattern, classifyLoudness} from './audio/analyzeAudio'
+import {analyzeAudio, type AnalysisResult, type Trend, BUCKET_SIZE, computeVibrationMap, computeNoiseFloor, computeTrends, trendsToVibrationPattern, classifyLoudness} from './audio/analyzeAudio'
 import WaveformView from './WaveformView'
 
 
@@ -56,7 +56,18 @@ function App() {
 
   const trends = useMemo(() => result ? computeTrends(result.channelData, result.sampleRate) : [], [result])
   const vibrationMap = useMemo(() => computeVibrationMap(trends), [trends])
+  const noiseFloor = useMemo(() => computeNoiseFloor(trends), [trends])
   const pattern = useMemo(() => trendsToVibrationPattern(trends, vibrationMap), [trends, vibrationMap])
+
+  // noise floor stats
+  useEffect(() => {
+    if (trends.length === 0) return
+    const peak = trends.reduce((max, t) => Math.max(max, t.max), 0)
+    const belowFloor = trends.filter(t => t.max > 0 && t.max < noiseFloor).length
+    const silent = trends.filter(t => t.max === 0).length
+    const total = trends.length
+    console.log(`[noise floor] peak=${peak}, noiseFloor=${noiseFloor.toFixed(4)}, buckets: ${total} total, ${silent} silent, ${belowFloor} below floor (${(belowFloor/total*100).toFixed(1)}% filtered), ${total - silent - belowFloor} above floor`)
+  }, [trends, noiseFloor])
 
   // uncomment to log trends/vibrationPattern for test fixtures
   // useEffect(() => {
@@ -223,7 +234,7 @@ function App() {
       {error && <p style={{color: '#ff6b6b'}}>Error: {error}</p>}
 
       {result && <>
-        <WaveformView channelData={result.channelData} sampleRate={result.sampleRate} trends={trends} vibrationMap={vibrationMap} playing={playing} playbackTime={playbackTime} audioEl={audioRef.current}/>
+        <WaveformView channelData={result.channelData} sampleRate={result.sampleRate} trends={trends} vibrationMap={vibrationMap} noiseFloor={noiseFloor} playing={playing} playbackTime={playbackTime} audioEl={audioRef.current}/>
         <ResultView result={result} trends={trends} vibrationMap={vibrationMap} pattern={pattern}/>
       </>}
     </div>
