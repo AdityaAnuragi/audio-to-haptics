@@ -15,6 +15,7 @@ export const VIBRATE_THRESHOLD_RATIO = 0.05 // noise floor as fraction of peak a
 export const VIBRATE_THRESHOLD_MIN = 0.005  // absolute minimum floor (prevents triggering on digital silence)
 export const NEIGHBOR_RADIUS = 5   // look at N buckets on each side (~300ms at 60ms/bucket), default 5
 export const SPIKE_RATIO = 1.5      // must be this much louder than neighbor average, default 1.5
+export const FORWARD_WEIGHT = 0.5     // future neighbors count Nx more in the average (sustains decay tails)
 
 export function computeNoiseFloor(trends: Trend[]): number {
   const peakAmplitude = trends.reduce((max, t) => Math.max(max, t.max), 0)
@@ -32,8 +33,9 @@ export function computeVibrationMap(trends: Trend[]): boolean[] {
     let count = 0
     for (let j = i - NEIGHBOR_RADIUS; j <= i + NEIGHBOR_RADIUS; j++) {
       if (j === i || j < 0 || j >= trends.length) continue
-      sum += trends[j].max
-      count++
+      const weight = j > i ? FORWARD_WEIGHT : 1
+      sum += trends[j].max * weight
+      count += weight
     }
 
     if (count === 0) return true // isolated bucket, no neighbors
