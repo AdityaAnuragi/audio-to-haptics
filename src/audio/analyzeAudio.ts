@@ -11,10 +11,10 @@ export interface Trend {
 
 export const BUCKET_SIZE = 4410 * 0.6
 
-export const VIBRATE_THRESHOLD_RATIO = 0.2 // noise floor as fraction of peak amplitude
-export const VIBRATE_THRESHOLD_MIN = 0.020  // absolute minimum floor (prevents triggering on digital silence)
-export const NEIGHBOR_RADIUS = 5   // look at N buckets on each side (~300ms at 60ms/bucket), default 5
-export const SPIKE_RATIO = 2      // must be this much louder than neighbor average, default 1.5
+export const VIBRATE_THRESHOLD_RATIO = 0.4 // noise floor as fraction of peak amplitude
+export const VIBRATE_THRESHOLD_MIN = 0.040  // absolute minimum floor (prevents triggering on digital silence)
+export const NEIGHBOR_RADIUS = 4   // look at N buckets on each side (~180ms at 60ms/bucket), default 5
+export const SPIKE_RATIO = 1.8      // must be this much louder than neighbor average, default 1.5
 export const PREVIOUS_WEIGHT = 0.5     // past neighbors count less in the average (helps decay tails sustain haptics)
 
 export function computeNoiseFloor(trends: Trend[]): number {
@@ -30,19 +30,26 @@ export function computeVibrationMap(trends: Trend[]): boolean[] {
     if (t.max < noiseFloor) return false
 
     let sum = 0
+    let undiscountedSum = 0
     let count = 0
     for (let j = i - NEIGHBOR_RADIUS; j <= i + NEIGHBOR_RADIUS; j++) {
       if (j === i || j < 0 || j >= trends.length) continue
       const weight = j < i ? PREVIOUS_WEIGHT : 1
       sum += trends[j].max * weight
+      undiscountedSum += trends[j].max
       count += 1
     }
 
     if (count === 0) return true // isolated bucket, no neighbors
     const neighborAvg = sum / count
+    const realAvg = undiscountedSum / count
     if (neighborAvg < 0.001) return true // spike from silence
 
-    return t.max / neighborAvg >= SPIKE_RATIO
+    const vibrate = t.max / neighborAvg >= SPIKE_RATIO
+    if (vibrate) {
+      console.log(`[${i}] max=${t.max} discountedAvg=${neighborAvg.toFixed(4)} realAvg=${realAvg.toFixed(4)} deflection=${((1 - neighborAvg/realAvg) * 100).toFixed(1)}% ratio=${(t.max/neighborAvg).toFixed(2)}`)
+    }
+    return vibrate
   })
 }
 
