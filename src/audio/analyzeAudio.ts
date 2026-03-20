@@ -11,19 +11,19 @@ export interface Trend {
 
 export const BUCKET_SIZE = 4410 * 0.6
 
-export const VIBRATE_THRESHOLD_RATIO = 0.4 // noise floor as fraction of peak amplitude
+export const VIBRATE_THRESHOLD_RATIO = 0.4 // noise floor as a fraction of peak amplitude
 export const VIBRATE_THRESHOLD_MIN = 0.040  // absolute minimum floor (prevents triggering on digital silence)
-export const NEIGHBOR_RADIUS = 4   // look at N buckets on each side (~180ms at 60ms/bucket), default 5
-export const SPIKE_RATIO = 1.5      // must be this much louder than neighbor average, default 1.5
-export const PREVIOUS_WEIGHT = 0.5     // past neighbors count less in the average (helps decay tails sustain haptics)
-export const SUSTAIN_THRESHOLD = 0.8   // minimum ratio of current to previous max to sustain vibration through decay
+export const NEIGHBOR_RADIUS = 4   // look at N buckets in the past (~240ms at 60ms/bucket)
+export const SPIKE_RATIO = 1.5      // must be this much louder than past neighbor average
+// export const PREVIOUS_WEIGHT = 0.5 // redundant with past-only comparison — asymmetry is already achieved by dropping future neighbors
+export const SUSTAIN_THRESHOLD = 0.75   // minimum ratio of current to previous max to sustain vibration through decay
 
 export function computeNoiseFloor(trends: Trend[]): number {
   const peakAmplitude = trends.reduce((max, t) => Math.max(max, t.max), 0)
   return Math.max(peakAmplitude * VIBRATE_THRESHOLD_RATIO, VIBRATE_THRESHOLD_MIN)
 }
 
-// Path B: compare each bucket to its neighbors instead of absolute threshold + RMS diff
+// Path B: compare each bucket to its past neighbors (past-only — no future context, avoids lifting future's loud neighbors into the average)
 export function computeVibrationMap(trends: Trend[]): boolean[] {
   const noiseFloor = computeNoiseFloor(trends)
   const result: boolean[] = []
@@ -31,7 +31,7 @@ export function computeVibrationMap(trends: Trend[]): boolean[] {
   for (let i = 0; i < trends.length; i++) {
     const t = trends[i]
 
-    // sustain check runs before noise floor — decay tail can bridge below the floor naturally
+    // sustain check runs before a noise floor — decay tail can bridge below the floor naturally
     let vibrate = false
     if (i > 0 && result[i - 1]) {
       const prev = trends[i - 1].max
@@ -45,25 +45,21 @@ export function computeVibrationMap(trends: Trend[]): boolean[] {
       if (t.max < noiseFloor) { result.push(false); continue }
 
       let sum = 0
-      let undiscountedSum = 0
       let count = 0
-      for (let j = i - NEIGHBOR_RADIUS; j <= i + NEIGHBOR_RADIUS; j++) {
-        if (j === i || j < 0 || j >= trends.length) continue
-        const weight = j < i ? PREVIOUS_WEIGHT : 1
-        sum += trends[j].max * weight
-        undiscountedSum += trends[j].max
+      for (let j = i - NEIGHBOR_RADIUS; j < i; j++) {
+        if (j < 0) continue
+        sum += trends[j].max
         count += 1
       }
 
       if (count === 0 || sum / count < 0.001) {
         vibrate = true // isolated bucket or spike from silence
       } else {
-        const neighborAvg = sum / count
-        const realAvg = undiscountedSum / count
-        const ratio = t.max / neighborAvg
+        const pastAvg = sum / count
+        const ratio = t.max / pastAvg
         vibrate = ratio >= SPIKE_RATIO
         if (vibrate) {
-          console.log(`[${i}] max=${t.max} discountedAvg=${neighborAvg.toFixed(4)} realAvg=${realAvg.toFixed(4)} deflection=${((1 - neighborAvg/realAvg) * 100).toFixed(1)}% ratio=${ratio.toFixed(2)}`)
+          console.log(`[${i}] max=${t.max} pastAvg=${pastAvg.toFixed(4)} ratio=${ratio.toFixed(2)}`)
         }
       }
     }
@@ -143,7 +139,7 @@ export function trendsToVibrationPattern(trends: Trend[], vibrationMap: boolean[
     }
   }
 
-  // Vibration API pattern starts with vibrate — if first segment is a pause, prepend 0
+  // Vibration API pattern starts with vibrating — if the first segment is a pause, prepend 0
   if (segments.length > 0 && !segments[0].vibrate) {
     segments.unshift({vibrate: true, ms: 0})
   }
