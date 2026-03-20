@@ -16,6 +16,7 @@ export const VIBRATE_THRESHOLD_MIN = 0.040  // absolute minimum floor (prevents 
 export const NEIGHBOR_RADIUS = 4   // look at N buckets on each side (~180ms at 60ms/bucket), default 5
 export const SPIKE_RATIO = 1.5      // must be this much louder than neighbor average, default 1.5
 export const PREVIOUS_WEIGHT = 0.5     // past neighbors count less in the average (helps decay tails sustain haptics)
+export const SUSTAIN_THRESHOLD = 0.8   // minimum ratio of current to previous max to sustain vibration through decay
 
 export function computeNoiseFloor(trends: Trend[]): number {
   const peakAmplitude = trends.reduce((max, t) => Math.max(max, t.max), 0)
@@ -25,32 +26,52 @@ export function computeNoiseFloor(trends: Trend[]): number {
 // Path B: compare each bucket to its neighbors instead of absolute threshold + RMS diff
 export function computeVibrationMap(trends: Trend[]): boolean[] {
   const noiseFloor = computeNoiseFloor(trends)
+  const result: boolean[] = []
 
-  return trends.map((t, i) => {
-    if (t.max < noiseFloor) return false
+  for (let i = 0; i < trends.length; i++) {
+    const t = trends[i]
 
-    let sum = 0
-    let undiscountedSum = 0
-    let count = 0
-    for (let j = i - NEIGHBOR_RADIUS; j <= i + NEIGHBOR_RADIUS; j++) {
-      if (j === i || j < 0 || j >= trends.length) continue
-      const weight = j < i ? PREVIOUS_WEIGHT : 1
-      sum += trends[j].max * weight
-      undiscountedSum += trends[j].max
-      count += 1
+    // sustain check runs before noise floor — decay tail can bridge below the floor naturally
+    let vibrate = false
+    if (i > 0 && result[i - 1]) {
+      const prev = trends[i - 1].max
+      if (t.max < prev && t.max >= prev * SUSTAIN_THRESHOLD) {
+        vibrate = true
+        console.log(`[${i}] sustained: max=${t.max} prev=${prev} pct=${(t.max / prev * 100).toFixed(1)}%`)
+      }
     }
 
-    if (count === 0) return true // isolated bucket, no neighbors
-    const neighborAvg = sum / count
-    const realAvg = undiscountedSum / count
-    if (neighborAvg < 0.001) return true // spike from silence
+    if (!vibrate) {
+      if (t.max < noiseFloor) { result.push(false); continue }
 
-    const vibrate = t.max / neighborAvg >= SPIKE_RATIO
-    if (vibrate) {
-      console.log(`[${i}] max=${t.max} discountedAvg=${neighborAvg.toFixed(4)} realAvg=${realAvg.toFixed(4)} deflection=${((1 - neighborAvg/realAvg) * 100).toFixed(1)}% ratio=${(t.max/neighborAvg).toFixed(2)}`)
+      let sum = 0
+      let undiscountedSum = 0
+      let count = 0
+      for (let j = i - NEIGHBOR_RADIUS; j <= i + NEIGHBOR_RADIUS; j++) {
+        if (j === i || j < 0 || j >= trends.length) continue
+        const weight = j < i ? PREVIOUS_WEIGHT : 1
+        sum += trends[j].max * weight
+        undiscountedSum += trends[j].max
+        count += 1
+      }
+
+      if (count === 0 || sum / count < 0.001) {
+        vibrate = true // isolated bucket or spike from silence
+      } else {
+        const neighborAvg = sum / count
+        const realAvg = undiscountedSum / count
+        const ratio = t.max / neighborAvg
+        vibrate = ratio >= SPIKE_RATIO
+        if (vibrate) {
+          console.log(`[${i}] max=${t.max} discountedAvg=${neighborAvg.toFixed(4)} realAvg=${realAvg.toFixed(4)} deflection=${((1 - neighborAvg/realAvg) * 100).toFixed(1)}% ratio=${ratio.toFixed(2)}`)
+        }
+      }
     }
-    return vibrate
-  })
+
+    result.push(vibrate)
+  }
+
+  return result
 }
 
 // post-processing attempt (burst-based density cap + onset memory) — reverted, added complexity without solving decay tail problem
