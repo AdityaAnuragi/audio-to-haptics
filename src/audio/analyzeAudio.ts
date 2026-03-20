@@ -14,10 +14,10 @@ export const BUCKET_SIZE = 4410 * 0.6
 export const VIBRATE_THRESHOLD_RATIO = 0.4 // noise floor as fraction of peak amplitude
 export const VIBRATE_THRESHOLD_MIN = 0.040  // absolute minimum floor (prevents triggering on digital silence)
 export const NEIGHBOR_RADIUS = 4   // look at N buckets on each side (~180ms at 60ms/bucket), default 5
-export const SPIKE_RATIO = 1.8      // must be this much louder than neighbor average, default 1.5
+export const SPIKE_RATIO = 1.5      // must be this much louder than neighbor average, default 1.5
 export const PREVIOUS_WEIGHT = 0.5     // past neighbors count less in the average (helps decay tails sustain haptics)
 
-const toggleSwitch = false
+const toggleSwitch = true
 
 export const MAX_BURST_LENGTH = toggleSwitch ? 5 : Infinity      // max true buckets per burst (~300ms) — longer bursts get truncated
 export const MAX_BURSTS_PER_WINDOW = toggleSwitch ? 3 : Infinity  // max bursts allowed in any density window
