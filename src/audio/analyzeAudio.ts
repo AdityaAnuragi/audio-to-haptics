@@ -17,26 +17,17 @@ export const NEIGHBOR_RADIUS = 4   // look at N buckets on each side (~180ms at 
 export const SPIKE_RATIO = 1.5      // must be this much louder than neighbor average, default 1.5
 export const PREVIOUS_WEIGHT = 0.5     // past neighbors count less in the average (helps decay tails sustain haptics)
 
-const toggleSwitch = true
-
-export const MAX_BURST_LENGTH = toggleSwitch ? 5 : Infinity      // max true buckets per burst (~300ms) — longer bursts get truncated
-export const MAX_BURSTS_PER_WINDOW = toggleSwitch ? 3 : Infinity  // max bursts allowed in any density window
-export const DENSITY_WINDOW_BUCKETS = 50 // density window size (~3s at 60ms/bucket)
-
 export function computeNoiseFloor(trends: Trend[]): number {
   const peakAmplitude = trends.reduce((max, t) => Math.max(max, t.max), 0)
   return Math.max(peakAmplitude * VIBRATE_THRESHOLD_RATIO, VIBRATE_THRESHOLD_MIN)
 }
 
 // Path B: compare each bucket to its neighbors instead of absolute threshold + RMS diff
-export function computeVibrationMap(trends: Trend[]): { map: boolean[], ratios: number[] } {
+export function computeVibrationMap(trends: Trend[]): boolean[] {
   const noiseFloor = computeNoiseFloor(trends)
-  const map: boolean[] = []
-  const ratios: number[] = []
 
-  for (let i = 0; i < trends.length; i++) {
-    const t = trends[i]
-    if (t.max < noiseFloor) { map.push(false); ratios.push(0); continue }
+  return trends.map((t, i) => {
+    if (t.max < noiseFloor) return false
 
     let sum = 0
     let undiscountedSum = 0
@@ -49,80 +40,21 @@ export function computeVibrationMap(trends: Trend[]): { map: boolean[], ratios: 
       count += 1
     }
 
-    if (count === 0) { map.push(true); ratios.push(Infinity); continue } // isolated bucket, no neighbors
+    if (count === 0) return true // isolated bucket, no neighbors
     const neighborAvg = sum / count
     const realAvg = undiscountedSum / count
-    if (neighborAvg < 0.001) { map.push(true); ratios.push(Infinity); continue } // spike from silence
+    if (neighborAvg < 0.001) return true // spike from silence
 
-    const ratio = t.max / neighborAvg
-    const vibrate = ratio >= SPIKE_RATIO
+    const vibrate = t.max / neighborAvg >= SPIKE_RATIO
     if (vibrate) {
-      console.log(`[${i}] max=${t.max} discountedAvg=${neighborAvg.toFixed(4)} realAvg=${realAvg.toFixed(4)} deflection=${((1 - neighborAvg/realAvg) * 100).toFixed(1)}% ratio=${ratio.toFixed(2)}`)
+      console.log(`[${i}] max=${t.max} discountedAvg=${neighborAvg.toFixed(4)} realAvg=${realAvg.toFixed(4)} deflection=${((1 - neighborAvg/realAvg) * 100).toFixed(1)}% ratio=${(t.max/neighborAvg).toFixed(2)}`)
     }
-    map.push(vibrate)
-    ratios.push(vibrate ? ratio : 0)
-  }
-
-  return { map, ratios }
+    return vibrate
+  })
 }
 
-export function postProcessVibrationMap(vibrationMap: boolean[], ratios: number[]): boolean[] {
-  const result = [...vibrationMap]
-
-  // Step 1: find bursts — consecutive true buckets with 1-gap tolerance
-  const bursts: { trueBuckets: number[], avgRatio: number }[] = []
-  let i = 0
-  while (i < result.length) {
-    if (!result[i]) { i++; continue }
-    const trueBuckets: number[] = []
-    let j = i
-    while (j < result.length) {
-      if (result[j]) {
-        trueBuckets.push(j)
-        j++
-      } else if (j + 1 < result.length && result[j + 1]) {
-        j++ // skip 1-gap false bucket (stays false in result)
-      } else {
-        break
-      }
-    }
-    const avgRatio = trueBuckets.reduce((sum, idx) => sum + ratios[idx], 0) / trueBuckets.length
-    bursts.push({ trueBuckets, avgRatio })
-    i = j
-  }
-
-  // Step 2: truncate bursts longer than MAX_BURST_LENGTH (keep onset, cut tail)
-  for (const burst of bursts) {
-    if (burst.trueBuckets.length > MAX_BURST_LENGTH) {
-      const removed = burst.trueBuckets.splice(MAX_BURST_LENGTH)
-      for (const idx of removed) result[idx] = false
-      burst.avgRatio = burst.trueBuckets.reduce((sum, idx) => sum + ratios[idx], 0) / burst.trueBuckets.length
-    }
-  }
-
-  // Step 3: density cap — non-overlapping windows, keep top MAX_BURSTS_PER_WINDOW by avgRatio
-  const beforeCount = result.filter(Boolean).length
-  for (let w = 0; w < result.length; w += DENSITY_WINDOW_BUCKETS) {
-    const windowBursts = bursts.filter(b =>
-      b.trueBuckets.length > 0 &&
-      b.trueBuckets[0] >= w &&
-      b.trueBuckets[0] < w + DENSITY_WINDOW_BUCKETS
-    )
-    if (windowBursts.length <= MAX_BURSTS_PER_WINDOW) continue
-    // remove weakest bursts until at cap
-    windowBursts.sort((a, b) => a.avgRatio - b.avgRatio)
-    const toRemove = windowBursts.slice(0, windowBursts.length - MAX_BURSTS_PER_WINDOW)
-    for (const burst of toRemove) {
-      for (const idx of burst.trueBuckets) result[idx] = false
-      burst.trueBuckets.length = 0 // mark as emptied
-    }
-  }
-
-  const afterCount = result.filter(Boolean).length
-  console.log(`[post-process] ${beforeCount} → ${afterCount} vibrating buckets, ${bursts.filter(b => b.trueBuckets.length > 0).length} bursts kept`)
-
-  return result
-}
+// post-processing attempt (burst-based density cap + onset memory) — reverted, added complexity without solving decay tail problem
+// export function postProcessVibrationMap(...) { ... }
 
 // old approach: absolute threshold + RMS left/right diff bounds
 // export function shouldVibrate(t: Trend): boolean {

@@ -1,6 +1,6 @@
 import {useEffect, useMemo, useRef, useState} from 'react'
 import './App.css'
-import {analyzeAudio, type AnalysisResult, type Trend, BUCKET_SIZE, computeVibrationMap, postProcessVibrationMap, computeNoiseFloor, computeTrends, trendsToVibrationPattern, classifyLoudness} from './audio/analyzeAudio'
+import {analyzeAudio, type AnalysisResult, type Trend, BUCKET_SIZE, computeVibrationMap, computeNoiseFloor, computeTrends, trendsToVibrationPattern, classifyLoudness} from './audio/analyzeAudio'
 import WaveformView from './WaveformView'
 
 
@@ -55,8 +55,7 @@ function App() {
   const lastInterruptionRef = useRef(0)
 
   const trends = useMemo(() => result ? computeTrends(result.channelData, result.sampleRate) : [], [result])
-  const { map: rawMap, ratios } = useMemo(() => computeVibrationMap(trends), [trends])
-  const vibrationMap = useMemo(() => postProcessVibrationMap(rawMap, ratios), [rawMap, ratios])
+  const vibrationMap = useMemo(() => computeVibrationMap(trends), [trends])
   const noiseFloor = useMemo(() => computeNoiseFloor(trends), [trends])
   const pattern = useMemo(() => trendsToVibrationPattern(trends, vibrationMap), [trends, vibrationMap])
 
