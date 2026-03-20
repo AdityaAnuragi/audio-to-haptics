@@ -1,10 +1,12 @@
 import {useRef, useState, useEffect} from 'react'
-import {type Trend, shouldVibrate, VIBRATE_THRESHOLD, BUCKET_SIZE} from './audio/analyzeAudio'
+import {type Trend, BUCKET_SIZE} from './audio/analyzeAudio'
 
 interface WaveformViewProps {
   channelData: Float32Array
   sampleRate: number
   trends: Trend[]
+  vibrationMap: boolean[]
+  noiseFloor: number
   playing: boolean
   playbackTime: number // seconds, from audioEl.currentTime
   audioEl: HTMLAudioElement | null
@@ -16,7 +18,7 @@ const WINDOW_SAMPLES = 44100 // 1 second at 44100Hz
 const PAD_LEFT_PCT = 45 / 800 * 100  // 5.625%
 const PAD_RIGHT_PCT = 10 / 800 * 100 // 1.25%
 
-export default function WaveformView({channelData, sampleRate, trends, playing, playbackTime}: WaveformViewProps) {
+export default function WaveformView({channelData, sampleRate, trends, vibrationMap, noiseFloor, playing, playbackTime}: WaveformViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [offset, setOffset] = useState(0)
   const maxOffset = Math.max(0, channelData.length - WINDOW_SAMPLES)
@@ -64,7 +66,8 @@ export default function WaveformView({channelData, sampleRate, trends, playing, 
   const currentTrend = playing
     ? trends[Math.floor(currentSample / BUCKET_SIZE)]
     : undefined
-  const isVibrating = currentTrend ? shouldVibrate(currentTrend) : false
+  const currentTrendIndex = playing ? Math.floor(currentSample / BUCKET_SIZE) : -1
+  const isVibrating = currentTrendIndex >= 0 ? (vibrationMap[currentTrendIndex] ?? false) : false
   const isLoud = currentTrend ? currentTrend.max > 0 : false
 
   useEffect(() => {
@@ -84,8 +87,9 @@ export default function WaveformView({channelData, sampleRate, trends, playing, 
     ctx.fillRect(0, 0, width, height)
 
     // Vibration overlay regions
-    for (const t of trends) {
-      if (!shouldVibrate(t)) continue
+    for (let ti = 0; ti < trends.length; ti++) {
+      const t = trends[ti]
+      if (!vibrationMap[ti]) continue
       if (t.endIndex < offset || t.startIndex >= windowEnd) continue
 
       const x1 = pad.left + ((Math.max(t.startIndex, offset) - offset) / windowLen) * plotW
@@ -127,7 +131,7 @@ export default function WaveformView({channelData, sampleRate, trends, playing, 
     // Threshold line
     ctx.strokeStyle = 'rgba(255, 100, 100, 0.3)'
     ctx.setLineDash([4, 4])
-    const threshY = pad.top + (1 - VIBRATE_THRESHOLD) * plotH
+    const threshY = pad.top + (1 - noiseFloor) * plotH
     ctx.beginPath()
     ctx.moveTo(pad.left, threshY)
     ctx.lineTo(pad.left + plotW, threshY)
@@ -152,7 +156,7 @@ export default function WaveformView({channelData, sampleRate, trends, playing, 
     ctx.font = '10px monospace'
     ctx.textAlign = 'right'
     ctx.fillText('1.0', pad.left - 4, pad.top + 4)
-    ctx.fillText(String(VIBRATE_THRESHOLD), pad.left - 4, threshY + 3)
+    ctx.fillText(String(noiseFloor), pad.left - 4, threshY + 3)
     ctx.fillText('0.0', pad.left - 4, pad.top + plotH + 4)
 
     // X-axis labels
@@ -171,7 +175,7 @@ export default function WaveformView({channelData, sampleRate, trends, playing, 
       ctx.lineTo(x, pad.top + plotH + 4)
       ctx.stroke()
     }
-  }, [channelData, offset, sampleRate, trends, windowEnd, windowLen])
+  }, [channelData, offset, sampleRate, trends, vibrationMap, noiseFloor, windowEnd, windowLen])
 
   return (
     <div>
@@ -179,7 +183,7 @@ export default function WaveformView({channelData, sampleRate, trends, playing, 
       <p style={{fontSize: '12px', color: '#888', margin: '4px 0'}}>
         Viewing {startMs}ms – {endMs}ms (window: {windowMs}ms)
         {' | '}<span style={{color: 'cyan'}}>cyan = vibration</span>
-        {' | '}<span style={{color: 'rgba(255, 100, 100, 0.6)'}}>dashed = threshold ({VIBRATE_THRESHOLD})</span>
+        {' | '}<span style={{color: 'rgba(255, 100, 100, 0.6)'}}>dashed = threshold ({noiseFloor})</span>
       </p>
       <canvas
         ref={canvasRef}

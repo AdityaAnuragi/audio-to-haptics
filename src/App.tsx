@@ -1,6 +1,6 @@
 import {useEffect, useMemo, useRef, useState} from 'react'
 import './App.css'
-import {analyzeAudio, type AnalysisResult, type Trend, BUCKET_SIZE, shouldVibrate, computeTrends, trendsToVibrationPattern, classifyLoudness} from './audio/analyzeAudio'
+import {analyzeAudio, type AnalysisResult, type Trend, BUCKET_SIZE, computeVibrationMap, computeNoiseFloor, computeTrends, trendsToVibrationPattern, classifyLoudness} from './audio/analyzeAudio'
 import WaveformView from './WaveformView'
 
 
@@ -8,6 +8,9 @@ const TEST_AUDIOS = [
   // public folder
   {url: '/TRIMMED Chippin In.mp3', label: 'TRIMMED Chippin In.mp3' },
   {url: '/Chop Suey.mp3', label: 'Chop Suey.mp3' },
+  {url: '/Death Metal Drumming.mp3', label: 'Death Metal (this is really good)' },
+  {url: '/Death Metal Drumming pt.2.mp3', label: 'Death Metal Drumming pt.2.mp3' },
+  {url: '/George Kollias -  Shall Rise Shall Be Dead.mp3', label: 'George Kollias (Spike - 1.4)' },
   // favorites
   {url: 'https://cdn.pixabay.com/audio/2022/11/05/audio_997c8fe344.mp3', label: 'Beep beep (0.5, perfect)'},
   {url: 'https://cdn.pixabay.com/audio/2024/01/24/audio_23938106b7.mp3', label: 'Bike (0.5, good)'},
@@ -39,7 +42,7 @@ const TEST_AUDIOS = [
 
 
 function App() {
-  const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2022/11/05/audio_997c8fe344.mp3')
+  const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2024/01/24/audio_23938106b7.mp3')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<AnalysisResult | null>(null)
@@ -52,7 +55,19 @@ function App() {
   const lastInterruptionRef = useRef(0)
 
   const trends = useMemo(() => result ? computeTrends(result.channelData, result.sampleRate) : [], [result])
-  const pattern = useMemo(() => trendsToVibrationPattern(trends), [trends])
+  const vibrationMap = useMemo(() => computeVibrationMap(trends), [trends])
+  const noiseFloor = useMemo(() => computeNoiseFloor(trends), [trends])
+  const pattern = useMemo(() => trendsToVibrationPattern(trends, vibrationMap), [trends, vibrationMap])
+
+  // noise floor stats
+  useEffect(() => {
+    if (trends.length === 0) return
+    const peak = trends.reduce((max, t) => Math.max(max, t.max), 0)
+    const belowFloor = trends.filter(t => t.max > 0 && t.max < noiseFloor).length
+    const silent = trends.filter(t => t.max === 0).length
+    const total = trends.length
+    console.log(`[noise floor] peak=${peak}, noiseFloor=${noiseFloor.toFixed(4)}, buckets: ${total} total, ${silent} silent, ${belowFloor} below floor (${(belowFloor/total*100).toFixed(1)}% filtered), ${total - silent - belowFloor} above floor`)
+  }, [trends, noiseFloor])
 
   // uncomment to log trends/vibrationPattern for test fixtures
   // useEffect(() => {
@@ -75,8 +90,7 @@ function App() {
           const inMuteWindow = performance.now() - lastInterruptionRef.current < muteWindowMs
           if (vibrateMode && trends.length > 0 && !inMuteWindow) {
             const bucketIndex = Math.floor((audio.currentTime * (result?.sampleRate ?? 44100)) / BUCKET_SIZE)
-            const trend = trends[bucketIndex]
-            const shouldVib = trend ? shouldVibrate(trend) : false
+            const shouldVib = vibrationMap[bucketIndex] ?? false
 
             if (shouldVib) {
               // fire/re-fire each frame to keep motor going across bucket boundaries
@@ -100,7 +114,7 @@ function App() {
       }
     }
     return () => cancelAnimationFrame(rafRef.current)
-  }, [playing, vibrateMode, trends, result])
+  }, [playing, vibrateMode, vibrationMap, result, trends.length])
 
   const handleAnalyze = async () => {
     setLoading(true)
@@ -220,14 +234,14 @@ function App() {
       {error && <p style={{color: '#ff6b6b'}}>Error: {error}</p>}
 
       {result && <>
-        <WaveformView channelData={result.channelData} sampleRate={result.sampleRate} trends={trends} playing={playing} playbackTime={playbackTime} audioEl={audioRef.current}/>
-        <ResultView result={result} trends={trends} pattern={pattern}/>
+        <WaveformView channelData={result.channelData} sampleRate={result.sampleRate} trends={trends} vibrationMap={vibrationMap} noiseFloor={noiseFloor} playing={playing} playbackTime={playbackTime} audioEl={audioRef.current}/>
+        <ResultView result={result} trends={trends} vibrationMap={vibrationMap} pattern={pattern}/>
       </>}
     </div>
   )
 }
 
-function ResultView({result, trends, pattern}: { result: AnalysisResult; trends: Trend[]; pattern: number[] }) {
+function ResultView({result, trends, vibrationMap, pattern}: { result: AnalysisResult; trends: Trend[]; vibrationMap: boolean[]; pattern: number[] }) {
   return (
     <div style={{textAlign: 'left'}}>
       <h2>Result</h2>
@@ -249,7 +263,7 @@ function ResultView({result, trends, pattern}: { result: AnalysisResult; trends:
 
       <h3>Trends (absolute values)</h3>
       {(() => {
-        const vibrateTrends = trends.filter(shouldVibrate)
+        const vibrateTrends = trends.filter((_, i) => vibrationMap[i])
         return <>
           <p style={{fontSize: '12px', color: '#888'}}>{vibrateTrends.length} vibrate-worthy trends</p>
           <div style={{maxHeight: '400px', overflow: 'auto', fontSize: '13px', fontFamily: 'monospace'}}>
