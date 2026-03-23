@@ -5,6 +5,8 @@ import WaveformView from './WaveformView'
 
 
 const TEST_AUDIOS = [
+  {url: 'https://cdn.pixabay.com/audio/2021/12/31/audio_6d5c2e6cc2.mp3', label: 'bass house' },
+  {url: 'https://cdn.pixabay.com/audio/2025/12/25/audio_2be1458a60.mp3', label: 'House Energetic Upbeat' },
   // public folder
   {url: '/TRIMMED Chippin In.mp3', label: 'TRIMMED Chippin In.mp3' },
   {url: '/Chop Suey.mp3', label: 'Chop Suey.mp3' },
