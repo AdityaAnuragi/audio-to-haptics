@@ -8,6 +8,11 @@ const TEST_AUDIOS = [
   {url: 'https://cdn.pixabay.com/audio/2021/12/31/audio_6d5c2e6cc2.mp3', label: 'bass house' },
   {url: 'https://cdn.pixabay.com/audio/2025/12/25/audio_2be1458a60.mp3', label: 'House Energetic Upbeat' },
   {url: 'when you\'re overqualified for the job.mp3', label: 'drumming meme video' },
+  {url: 'https://cdn.pixabay.com/audio/2022/03/24/audio_51594bdccc.mp3', label: 'heart beat' },
+  {url: 'https://cdn.pixabay.com/audio/2025/07/16/audio_a368a84757.mp3', label: 'thunder' },
+  {url: 'https://cdn.pixabay.com/audio/2025/07/24/audio_567d8dde9e.mp3', label: 'fireworks' },
+  {url: 'https://cdn.pixabay.com/audio/2026/02/20/audio_4ea619fc0d.mp3', label: 'Whip' },
+  {url: 'https://cdn.pixabay.com/audio/2022/03/10/audio_7f90c5e4fc.mp3', label: 'Metal clashing' },
   // public folder
   {url: '/TRIMMED Chippin In.mp3', label: 'TRIMMED Chippin In.mp3' },
   {url: '/Chop Suey.mp3', label: 'Chop Suey.mp3' },
