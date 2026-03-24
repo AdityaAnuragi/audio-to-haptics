@@ -259,6 +259,15 @@ function ResultView({result, trends, vibrationMap, pattern}: { result: AnalysisR
       <button onClick={() => navigator.vibrate(0)} style={{marginLeft: '8px'}}>
         Stop Vibration
       </button>
+      <button
+        onClick={() => {
+          const data = JSON.stringify({trends, vibrationMap, vibrationPattern: pattern})
+          navigator.clipboard.writeText(data).then(() => alert('Copied!'))
+        }}
+        style={{marginLeft: '8px'}}
+      >
+        Copy Test Data
+      </button>
       <p style={{fontSize: '12px', color: '#888'}}>
         Pattern: [{pattern.join(', ')}] ({pattern.length} entries)
       </p>
