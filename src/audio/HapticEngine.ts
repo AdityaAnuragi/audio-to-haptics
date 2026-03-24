@@ -1,0 +1,140 @@
+import {
+  analyzeAudio,
+  decodeAudioBuffer,
+  computeTrends,
+  computeVibrationMap,
+  computeNoiseFloor,
+  trendsToVibrationPattern,
+  type AnalysisResult,
+  type Trend,
+  BUCKET_SIZE,
+} from './analyzeAudio'
+
+export class HapticEngine {
+  private _channelData: Float32Array | null = null
+  private _sampleRate: number = 44100
+  private _duration: number = 0
+  private _numberOfChannels: number = 0
+  private _outputLatency: number = 0
+  private _baseLatency: number = 0
+  private _trends: Trend[] = []
+  private _vibrationMap: boolean[] = []
+  private _noiseFloor: number = 0
+  private _pattern: number[] = []
+
+  private _rafId = 0
+  private _wasVibrating = false
+  private _lastInterruption = 0
+  private _audioEl: HTMLAudioElement | null = null
+  private _onTick: ((time: number) => void) | null = null
+  private _cleanup: (() => void) | null = null
+
+  get channelData(): Float32Array | null { return this._channelData ? new Float32Array(this._channelData) : null }
+  get sampleRate(): number { return this._sampleRate }
+  get duration(): number { return this._duration }
+  get numberOfChannels(): number { return this._numberOfChannels }
+  get outputLatency(): number { return this._outputLatency }
+  get baseLatency(): number { return this._baseLatency }
+  get trends(): Trend[] { return structuredClone(this._trends) }
+  get vibrationMap(): boolean[] { return [...this._vibrationMap] }
+  get noiseFloor(): number { return this._noiseFloor }
+  get pattern(): number[] { return [...this._pattern] }
+
+  async analyze(url: string): Promise<void> {
+    const result = await analyzeAudio(url)
+    this._storeResult(result)
+  }
+
+  /** For when the user already has raw audio bytes (file input, drag-and-drop, WebSocket, etc.) */
+  async analyzeBuffer(arrayBuffer: ArrayBuffer): Promise<void> {
+    const result = await decodeAudioBuffer(arrayBuffer)
+    this._storeResult(result)
+  }
+
+  private _storeResult(result: AnalysisResult): void {
+    this._channelData = result.channelData
+    this._sampleRate = result.sampleRate
+    this._duration = result.duration
+    this._numberOfChannels = result.numberOfChannels
+    this._outputLatency = result.outputLatency
+    this._baseLatency = result.baseLatency
+    this._trends = computeTrends(result.channelData, result.sampleRate)
+    this._vibrationMap = computeVibrationMap(this._trends)
+    this._noiseFloor = computeNoiseFloor(this._trends)
+    this._pattern = trendsToVibrationPattern(this._trends, this._vibrationMap)
+
+    const peak = this._trends.reduce((max, t) => Math.max(max, t.max), 0)
+    const belowFloor = this._trends.filter(t => t.max > 0 && t.max < this._noiseFloor).length
+    const silent = this._trends.filter(t => t.max === 0).length
+    const total = this._trends.length
+    console.log(`[noise floor] peak=${peak}, noiseFloor=${this._noiseFloor.toFixed(4)}, buckets: ${total} total, ${silent} silent, ${belowFloor} below floor (${(belowFloor/total*100).toFixed(1)}% filtered), ${total - silent - belowFloor} above floor`)
+  }
+
+  attach(audioEl: HTMLAudioElement, onTick?: (time: number) => void): void {
+    this.detach()
+    this._audioEl = audioEl
+    this._onTick = onTick ?? null
+    this._lastInterruption = performance.now()
+
+    const onPause = () => {
+      if (this._wasVibrating) {
+        navigator.vibrate(0)
+        this._wasVibrating = false
+      }
+    }
+
+    const onSeeked = () => {
+      if (this._wasVibrating) {
+        navigator.vibrate(0)
+        this._wasVibrating = false
+      }
+      this._lastInterruption = performance.now()
+    }
+
+    audioEl.addEventListener('pause', onPause)
+    audioEl.addEventListener('seeked', onSeeked)
+
+    this._cleanup = () => {
+      audioEl.removeEventListener('pause', onPause)
+      audioEl.removeEventListener('seeked', onSeeked)
+    }
+
+    const tick = () => {
+      if (this._audioEl) {
+        const currentTime = this._audioEl.currentTime
+        this._onTick?.(currentTime)
+
+        const muteWindowMs = (this._outputLatency + this._baseLatency) * 1000
+        const inMuteWindow = performance.now() - this._lastInterruption < muteWindowMs
+
+        if (this._trends.length > 0 && !inMuteWindow) {
+          const bucketIndex = Math.floor((currentTime * this._sampleRate) / BUCKET_SIZE)
+          const shouldVib = this._vibrationMap[bucketIndex] ?? false
+
+          if (shouldVib) {
+            navigator.vibrate(Math.round(BUCKET_SIZE / this._sampleRate * 1000))
+            this._wasVibrating = true
+          } else if (this._wasVibrating) {
+            navigator.vibrate(0)
+            this._wasVibrating = false
+          }
+        }
+      }
+      this._rafId = requestAnimationFrame(tick)
+    }
+    this._rafId = requestAnimationFrame(tick)
+  }
+
+  detach(): void {
+    cancelAnimationFrame(this._rafId)
+    this._rafId = 0
+    if (this._wasVibrating) {
+      navigator.vibrate(0)
+      this._wasVibrating = false
+    }
+    this._cleanup?.()
+    this._cleanup = null
+    this._audioEl = null
+    this._onTick = null
+  }
+}

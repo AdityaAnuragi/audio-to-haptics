@@ -1,6 +1,7 @@
-import {useEffect, useMemo, useRef, useState} from 'react'
+import {useEffect, useRef, useState} from 'react'
 import './App.css'
-import {analyzeAudio, type AnalysisResult, type Trend, BUCKET_SIZE, computeVibrationMap, computeNoiseFloor, computeTrends, trendsToVibrationPattern, classifyLoudness} from './audio/analyzeAudio'
+import {type Trend, classifyLoudness} from './audio/analyzeAudio'
+import {HapticEngine} from './audio/HapticEngine'
 import WaveformView from './WaveformView'
 
 
@@ -48,95 +49,85 @@ const TEST_AUDIOS = [
   {url: 'https://cdn.pixabay.com/audio/2022/11/04/audio_9ff1118f72.mp3', label: 'More beeps 2 (0.5)'},
 ]
 
+interface Analysis {
+  channelData: Float32Array
+  sampleRate: number
+  duration: number
+  numberOfChannels: number
+  outputLatency: number
+  baseLatency: number
+  trends: Trend[]
+  vibrationMap: boolean[]
+  noiseFloor: number
+  pattern: number[]
+}
 
 function App() {
   const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2024/01/24/audio_23938106b7.mp3')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [result, setResult] = useState<AnalysisResult | null>(null)
+  const [analysis, setAnalysis] = useState<Analysis | null>(null)
   const [playing, setPlaying] = useState(false)
-  const [playbackTime, setPlaybackTime] = useState(0) // seconds, from audioEl.currentTime
+  const [playbackTime, setPlaybackTime] = useState(0)
   const [vibrateMode, setVibrateMode] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const rafRef = useRef<number>(0)
-  const wasVibratingRef = useRef(false)
-  const lastInterruptionRef = useRef(0)
+  // const rafRef = useRef<number>(0)
+  const engineRef = useRef(new HapticEngine())
 
-  const trends = useMemo(() => result ? computeTrends(result.channelData, result.sampleRate) : [], [result])
-  const vibrationMap = useMemo(() => computeVibrationMap(trends), [trends])
-  const noiseFloor = useMemo(() => computeNoiseFloor(trends), [trends])
-  const pattern = useMemo(() => trendsToVibrationPattern(trends, vibrationMap), [trends, vibrationMap])
+  const trends = analysis?.trends ?? []
+  const vibrationMap = analysis?.vibrationMap ?? []
+  const noiseFloor = analysis?.noiseFloor ?? 0
+  const pattern = analysis?.pattern ?? []
 
-  // noise floor stats
+  // cleanup engine on unmount
+  useEffect(() => () => engineRef.current.detach(), [])
+
+  // play-only RAF for playbackTime (no vibration)
   useEffect(() => {
-    if (trends.length === 0) return
-    const peak = trends.reduce((max, t) => Math.max(max, t.max), 0)
-    const belowFloor = trends.filter(t => t.max > 0 && t.max < noiseFloor).length
-    const silent = trends.filter(t => t.max === 0).length
-    const total = trends.length
-    console.log(`[noise floor] peak=${peak}, noiseFloor=${noiseFloor.toFixed(4)}, buckets: ${total} total, ${silent} silent, ${belowFloor} below floor (${(belowFloor/total*100).toFixed(1)}% filtered), ${total - silent - belowFloor} above floor`)
-  }, [trends, noiseFloor])
-
-  // uncomment to log trends/vibrationPattern for test fixtures
-  // useEffect(() => {
-  //   if (trends.length > 0) {
-  //     console.log('trends:', JSON.stringify(trends))
-  //     console.log('vibrationPattern:', JSON.stringify(pattern))
-  //   }
-  // }, [trends, pattern])
-
-  useEffect(() => {
-    if (playing) {
-      const tick = () => {
-        const audio = audioRef.current
-        if (audio) {
-          setPlaybackTime(audio.currentTime)
-
-          // RAF-synced vibration: look up trend at current playback position
-          // Mute window: suppress haptics during audio pipeline warmup
-          const muteWindowMs = ((result?.outputLatency ?? 0) + (result?.baseLatency ?? 0)) * 1000
-          const inMuteWindow = performance.now() - lastInterruptionRef.current < muteWindowMs
-          if (vibrateMode && trends.length > 0 && !inMuteWindow) {
-            const bucketIndex = Math.floor((audio.currentTime * (result?.sampleRate ?? 44100)) / BUCKET_SIZE)
-            const shouldVib = vibrationMap[bucketIndex] ?? false
-
-            if (shouldVib) {
-              // fire/re-fire each frame to keep motor going across bucket boundaries
-              navigator.vibrate(Math.round(BUCKET_SIZE / (result?.sampleRate ?? 44100) * 1000))
-              wasVibratingRef.current = true
-            } else if (wasVibratingRef.current) {
-              navigator.vibrate(0)
-              wasVibratingRef.current = false
-            }
-          }
-        }
-        rafRef.current = requestAnimationFrame(tick)
-      }
-      rafRef.current = requestAnimationFrame(tick)
-    } else {
-      cancelAnimationFrame(rafRef.current)
-      setPlaybackTime(0)
-      if (wasVibratingRef.current) {
-        navigator.vibrate(0)
-        wasVibratingRef.current = false
-      }
+    if (!playing || vibrateMode) return
+    let rafId = 0
+    const tick = () => {
+      if (audioRef.current) setPlaybackTime(audioRef.current.currentTime)
+      rafId = requestAnimationFrame(tick)
     }
-    return () => cancelAnimationFrame(rafRef.current)
-  }, [playing, vibrateMode, vibrationMap, result, trends.length])
+    rafId = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(rafId)
+  }, [playing, vibrateMode])
 
   const handleAnalyze = async () => {
     setLoading(true)
     setError(null)
-    setResult(null)
+    setAnalysis(null)
 
     try {
-      const data = await analyzeAudio(url)
-      setResult(data)
+      const engine = engineRef.current
+      await engine.analyze(url)
+      setAnalysis({
+        channelData: engine.channelData!,
+        sampleRate: engine.sampleRate,
+        duration: engine.duration,
+        numberOfChannels: engine.numberOfChannels,
+        outputLatency: engine.outputLatency,
+        baseLatency: engine.baseLatency,
+        trends: engine.trends,
+        vibrationMap: engine.vibrationMap,
+        noiseFloor: engine.noiseFloor,
+        pattern: engine.pattern,
+      })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unknown error')
     } finally {
       setLoading(false)
     }
+  }
+
+  const stop = () => {
+    engineRef.current.detach()
+    audioRef.current?.pause()
+    audioRef.current = null
+    setVibrateMode(false)
+    setPlaying(false)
+    setPlaybackTime(0)
   }
 
   return (
@@ -153,16 +144,10 @@ function App() {
             } else {
               setUrl(val)
             }
-            setResult(null)
+            setAnalysis(null)
             setError(null)
-            setPlaybackTime(0)
-            if (playing) {
-              audioRef.current?.pause()
-              audioRef.current = null
-              navigator.vibrate(0)
-              setVibrateMode(false)
-              setPlaying(false)
-            }
+            if (playing) stop()
+            else setPlaybackTime(0)
           }}
           style={{flex: 1, padding: '8px', fontSize: '14px'}}
         >
@@ -187,18 +172,10 @@ function App() {
         <button
           onClick={() => {
             if (playing) {
-              audioRef.current?.pause()
-              audioRef.current = null
-              navigator.vibrate(0)
-              setVibrateMode(false)
-              setPlaying(false)
+              stop()
             } else {
               const audio = new Audio(url)
-              audio.onended = () => {
-                navigator.vibrate(0);
-                setVibrateMode(false)
-                setPlaying(false)
-              }
+              audio.onended = () => stop()
               void audio.play()
               audioRef.current = audio
               setPlaying(true)
@@ -211,20 +188,12 @@ function App() {
         <button
           onClick={async () => {
             if (playing) {
-              audioRef.current?.pause()
-              audioRef.current = null
-              navigator.vibrate(0)
-              setVibrateMode(false)
-              setPlaying(false)
+              stop()
             } else {
               const audio = new Audio(url)
-              audio.onended = () => {
-                navigator.vibrate(0);
-                setVibrateMode(false)
-                setPlaying(false)
-              }
-              await audio.play() // wait for playback to actually begin before starting RAF loop
-              lastInterruptionRef.current = performance.now()
+              audio.onended = () => stop()
+              await audio.play()
+              engineRef.current.attach(audio, (t) => setPlaybackTime(t))
               setVibrateMode(true)
               audioRef.current = audio
               setPlaying(true)
@@ -241,15 +210,15 @@ function App() {
 
       {error && <p style={{color: '#ff6b6b'}}>Error: {error}</p>}
 
-      {result && <>
-        <WaveformView channelData={result.channelData} sampleRate={result.sampleRate} trends={trends} vibrationMap={vibrationMap} noiseFloor={noiseFloor} playing={playing} playbackTime={playbackTime} audioEl={audioRef.current}/>
-        <ResultView result={result} trends={trends} vibrationMap={vibrationMap} pattern={pattern}/>
+      {analysis && <>
+        <WaveformView channelData={analysis.channelData} sampleRate={analysis.sampleRate} trends={trends} vibrationMap={vibrationMap} noiseFloor={noiseFloor} playing={playing} playbackTime={playbackTime} audioEl={audioRef.current}/>
+        <ResultView analysis={analysis} trends={trends} vibrationMap={vibrationMap} pattern={pattern}/>
       </>}
     </div>
   )
 }
 
-function ResultView({result, trends, vibrationMap, pattern}: { result: AnalysisResult; trends: Trend[]; vibrationMap: boolean[]; pattern: number[] }) {
+function ResultView({analysis, trends, vibrationMap, pattern}: { analysis: Analysis; trends: Trend[]; vibrationMap: boolean[]; pattern: number[] }) {
   return (
     <div style={{textAlign: 'left'}}>
       <h2>Result</h2>
@@ -271,12 +240,12 @@ function ResultView({result, trends, vibrationMap, pattern}: { result: AnalysisR
       <p style={{fontSize: '12px', color: '#888'}}>
         Pattern: [{pattern.join(', ')}] ({pattern.length} entries)
       </p>
-      <p>Sample Rate: {result.sampleRate} Hz</p>
-      <p>Duration: {result.duration.toFixed(2)}s</p>
-      <p>Channels: {result.numberOfChannels}</p>
-      <p>Total Samples: {result.channelData.length.toLocaleString()}</p>
-      <p>Output Latency: {result.outputLatency}s ({Math.round(result.outputLatency * 1000)}ms)</p>
-      <p>Base Latency: {result.baseLatency}s ({Math.round(result.baseLatency * 1000)}ms)</p>
+      <p>Sample Rate: {analysis.sampleRate} Hz</p>
+      <p>Duration: {analysis.duration.toFixed(2)}s</p>
+      <p>Channels: {analysis.numberOfChannels}</p>
+      <p>Total Samples: {analysis.channelData.length.toLocaleString()}</p>
+      <p>Output Latency: {analysis.outputLatency}s ({Math.round(analysis.outputLatency * 1000)}ms)</p>
+      <p>Base Latency: {analysis.baseLatency}s ({Math.round(analysis.baseLatency * 1000)}ms)</p>
 
       <h3>Trends (absolute values)</h3>
       {(() => {
