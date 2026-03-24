@@ -7,10 +7,12 @@ import {
   trendsToVibrationPattern,
   type AnalysisResult,
   type Trend,
-  BUCKET_SIZE,
+  type HapticOptions,
+  DEFAULT_OPTIONS,
 } from './analyzeAudio'
 
 export class HapticEngine {
+  private readonly _opts: HapticOptions
   private _channelData: Float32Array | null = null
   private _sampleRate: number = 44100
   private _duration: number = 0
@@ -29,6 +31,10 @@ export class HapticEngine {
   private _onTick: ((time: number) => void) | null = null
   private _cleanup: (() => void) | null = null
 
+  constructor(opts: Partial<HapticOptions> = {}) {
+    this._opts = {...DEFAULT_OPTIONS, ...opts}
+  }
+
   get channelData(): Float32Array | null { return this._channelData ? new Float32Array(this._channelData) : null }
   get sampleRate(): number { return this._sampleRate }
   get duration(): number { return this._duration }
@@ -38,6 +44,7 @@ export class HapticEngine {
   get trends(): Trend[] { return structuredClone(this._trends) }
   get vibrationMap(): boolean[] { return [...this._vibrationMap] }
   get noiseFloor(): number { return this._noiseFloor }
+  get bucketSize(): number { return this._opts.bucketSize }
   get pattern(): number[] { return [...this._pattern] }
 
   async analyze(url: string): Promise<void> {
@@ -58,9 +65,9 @@ export class HapticEngine {
     this._numberOfChannels = result.numberOfChannels
     this._outputLatency = result.outputLatency
     this._baseLatency = result.baseLatency
-    this._trends = computeTrends(result.channelData, result.sampleRate)
-    this._vibrationMap = computeVibrationMap(this._trends)
-    this._noiseFloor = computeNoiseFloor(this._trends)
+    this._trends = computeTrends(result.channelData, result.sampleRate, this._opts.bucketSize)
+    this._vibrationMap = computeVibrationMap(this._trends, this._opts)
+    this._noiseFloor = computeNoiseFloor(this._trends, this._opts)
     this._pattern = trendsToVibrationPattern(this._trends, this._vibrationMap)
 
     const peak = this._trends.reduce((max, t) => Math.max(max, t.max), 0)
@@ -99,6 +106,7 @@ export class HapticEngine {
       audioEl.removeEventListener('seeked', onSeeked)
     }
 
+    const bucketSize = this._opts.bucketSize
     const tick = () => {
       if (this._audioEl) {
         const currentTime = this._audioEl.currentTime
@@ -108,11 +116,11 @@ export class HapticEngine {
         const inMuteWindow = performance.now() - this._lastInterruption < muteWindowMs
 
         if (this._trends.length > 0 && !inMuteWindow) {
-          const bucketIndex = Math.floor((currentTime * this._sampleRate) / BUCKET_SIZE)
+          const bucketIndex = Math.floor((currentTime * this._sampleRate) / bucketSize)
           const shouldVib = this._vibrationMap[bucketIndex] ?? false
 
           if (shouldVib) {
-            navigator.vibrate(Math.round(BUCKET_SIZE / this._sampleRate * 1000))
+            navigator.vibrate(Math.round(bucketSize / this._sampleRate * 1000))
             this._wasVibrating = true
           } else if (this._wasVibrating) {
             navigator.vibrate(0)

@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react'
 import './App.css'
-import {type Trend, classifyLoudness} from './audio/analyzeAudio'
+import {type Trend, classifyLoudness, DEFAULT_OPTIONS} from './audio/analyzeAudio'
 import {HapticEngine} from './audio/HapticEngine'
 import WaveformView from './WaveformView'
 
@@ -59,6 +59,7 @@ interface Analysis {
   trends: Trend[]
   vibrationMap: boolean[]
   noiseFloor: number
+  bucketSize: number
   pattern: number[]
 }
 
@@ -77,6 +78,7 @@ function App() {
   const trends = analysis?.trends ?? []
   const vibrationMap = analysis?.vibrationMap ?? []
   const noiseFloor = analysis?.noiseFloor ?? 0
+  const bucketSize = analysis?.bucketSize ?? DEFAULT_OPTIONS.bucketSize
   const pattern = analysis?.pattern ?? []
 
   // cleanup engine on unmount
@@ -112,6 +114,7 @@ function App() {
         trends: engine.trends,
         vibrationMap: engine.vibrationMap,
         noiseFloor: engine.noiseFloor,
+        bucketSize: engine.bucketSize,
         pattern: engine.pattern,
       })
     } catch (e) {
@@ -211,7 +214,7 @@ function App() {
       {error && <p style={{color: '#ff6b6b'}}>Error: {error}</p>}
 
       {analysis && <>
-        <WaveformView channelData={analysis.channelData} sampleRate={analysis.sampleRate} trends={trends} vibrationMap={vibrationMap} noiseFloor={noiseFloor} playing={playing} playbackTime={playbackTime} audioEl={audioRef.current}/>
+        <WaveformView channelData={analysis.channelData} sampleRate={analysis.sampleRate} trends={trends} vibrationMap={vibrationMap} noiseFloor={noiseFloor} bucketSize={bucketSize} playing={playing} playbackTime={playbackTime} audioEl={audioRef.current}/>
         <ResultView analysis={analysis} trends={trends} vibrationMap={vibrationMap} pattern={pattern}/>
       </>}
     </div>

@@ -9,23 +9,40 @@ export interface Trend {
   rightRms: number
 }
 
-export const BUCKET_SIZE = 4410 * 0.6
+export interface HapticOptions {
+  bucketSize: number
+  vibrateThresholdRatio: number // noise floor as a fraction of peak amplitude
+  vibrateThresholdMin: number   // absolute minimum floor (prevents triggering on digital silence)
+  neighborRadius: number        // look at N buckets in the past (~240ms at 60ms/bucket)
+  spikeRatio: number            // must be this much louder than past neighbor average
+  sustainThreshold: number      // minimum ratio of current to previous max to sustain vibration through decay
+}
 
-export const VIBRATE_THRESHOLD_RATIO = 0.4 // noise floor as a fraction of peak amplitude
-export const VIBRATE_THRESHOLD_MIN = 0.040  // absolute minimum floor (prevents triggering on digital silence)
-export const NEIGHBOR_RADIUS = 4   // look at N buckets in the past (~240ms at 60ms/bucket)
-export const SPIKE_RATIO = 1.5      // must be this much louder than past neighbor average
+export const DEFAULT_OPTIONS: HapticOptions = {
+  bucketSize: 4410 * 0.6,
+  vibrateThresholdRatio: 0.4,
+  vibrateThresholdMin: 0.040,
+  neighborRadius: 4,
+  spikeRatio: 1.5,
+  sustainThreshold: 0.75,
+}
+
+// export const BUCKET_SIZE = DEFAULT_OPTIONS.bucketSize
+// export const VIBRATE_THRESHOLD_RATIO = DEFAULT_OPTIONS.vibrateThresholdRatio
+// export const VIBRATE_THRESHOLD_MIN = DEFAULT_OPTIONS.vibrateThresholdMin
+// export const NEIGHBOR_RADIUS = DEFAULT_OPTIONS.neighborRadius
+// export const SPIKE_RATIO = DEFAULT_OPTIONS.spikeRatio
 // export const PREVIOUS_WEIGHT = 0.5 // redundant with past-only comparison — asymmetry is already achieved by dropping future neighbors
-export const SUSTAIN_THRESHOLD = 0.75   // minimum ratio of current to previous max to sustain vibration through decay
+// export const SUSTAIN_THRESHOLD = DEFAULT_OPTIONS.sustainThreshold
 
-export function computeNoiseFloor(trends: Trend[]): number {
+export function computeNoiseFloor(trends: Trend[], opts: HapticOptions = DEFAULT_OPTIONS): number {
   const peakAmplitude = trends.reduce((max, t) => Math.max(max, t.max), 0)
-  return Math.max(peakAmplitude * VIBRATE_THRESHOLD_RATIO, VIBRATE_THRESHOLD_MIN)
+  return Math.max(peakAmplitude * opts.vibrateThresholdRatio, opts.vibrateThresholdMin)
 }
 
 // Path B: compare each bucket to its past neighbors (past-only — no future context, avoids lifting future's loud neighbors into the average)
-export function computeVibrationMap(trends: Trend[]): boolean[] {
-  const noiseFloor = computeNoiseFloor(trends)
+export function computeVibrationMap(trends: Trend[], opts: HapticOptions = DEFAULT_OPTIONS): boolean[] {
+  const noiseFloor = computeNoiseFloor(trends, opts)
   const result: boolean[] = []
 
   for (let i = 0; i < trends.length; i++) {
@@ -35,7 +52,7 @@ export function computeVibrationMap(trends: Trend[]): boolean[] {
     let vibrate = false
     if (i > 0 && result[i - 1]) {
       const prev = trends[i - 1].max
-      if (t.max < prev && t.max >= prev * SUSTAIN_THRESHOLD) {
+      if (t.max < prev && t.max >= prev * opts.sustainThreshold) {
         vibrate = true
         console.log(`[${i}] sustained: max=${t.max} prev=${prev} pct=${(t.max / prev * 100).toFixed(1)}%`)
       }
@@ -46,7 +63,7 @@ export function computeVibrationMap(trends: Trend[]): boolean[] {
 
       let sum = 0
       let count = 0
-      for (let j = i - NEIGHBOR_RADIUS; j < i; j++) {
+      for (let j = i - opts.neighborRadius; j < i; j++) {
         if (j < 0) continue
         sum += trends[j].max
         count += 1
@@ -57,7 +74,7 @@ export function computeVibrationMap(trends: Trend[]): boolean[] {
       } else {
         const pastAvg = sum / count
         const ratio = t.max / pastAvg
-        vibrate = ratio >= SPIKE_RATIO
+        vibrate = ratio >= opts.spikeRatio
         if (vibrate) {
           console.log(`[${i}] max=${t.max} pastAvg=${pastAvg.toFixed(4)} ratio=${ratio.toFixed(2)}`)
         }
@@ -81,7 +98,7 @@ export function computeVibrationMap(trends: Trend[]): boolean[] {
 //   return (t.max >= VIBRATE_THRESHOLD) && (lowerBound <= diff && diff <= upperBound)
 // }
 
-export function computeTrends(data: Float32Array, sampleRate: number, bucketSize = BUCKET_SIZE): Trend[] {
+export function computeTrends(data: Float32Array, sampleRate: number, bucketSize = DEFAULT_OPTIONS.bucketSize): Trend[] {
   const trends: Trend[] = []
 
   for (let i = 0; i < data.length; i += bucketSize) {

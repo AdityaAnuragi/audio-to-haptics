@@ -1,5 +1,5 @@
 import {useRef, useState, useEffect} from 'react'
-import {type Trend, BUCKET_SIZE} from './audio/analyzeAudio'
+import {type Trend, DEFAULT_OPTIONS} from './audio/analyzeAudio'
 
 interface WaveformViewProps {
   channelData: Float32Array
@@ -7,6 +7,7 @@ interface WaveformViewProps {
   trends: Trend[]
   vibrationMap: boolean[]
   noiseFloor: number
+  bucketSize?: number
   playing: boolean
   playbackTime: number // seconds, from audioEl.currentTime
   audioEl: HTMLAudioElement | null
@@ -18,7 +19,7 @@ const WINDOW_SAMPLES = 44100 // 1 second at 44100Hz
 const PAD_LEFT_PCT = 45 / 800 * 100  // 5.625%
 const PAD_RIGHT_PCT = 10 / 800 * 100 // 1.25%
 
-export default function WaveformView({channelData, sampleRate, trends, vibrationMap, noiseFloor, playing, playbackTime}: WaveformViewProps) {
+export default function WaveformView({channelData, sampleRate, trends, vibrationMap, noiseFloor, bucketSize = DEFAULT_OPTIONS.bucketSize, playing, playbackTime}: WaveformViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [offset, setOffset] = useState(0)
   const maxOffset = Math.max(0, channelData.length - WINDOW_SAMPLES)
@@ -64,9 +65,9 @@ export default function WaveformView({channelData, sampleRate, trends, vibration
 
   // Current trend at playhead (direct index access — 1:1 bucket-to-trend mapping)
   const currentTrend = playing
-    ? trends[Math.floor(currentSample / BUCKET_SIZE)]
+    ? trends[Math.floor(currentSample / bucketSize)]
     : undefined
-  const currentTrendIndex = playing ? Math.floor(currentSample / BUCKET_SIZE) : -1
+  const currentTrendIndex = playing ? Math.floor(currentSample / bucketSize) : -1
   const isVibrating = currentTrendIndex >= 0 ? (vibrationMap[currentTrendIndex] ?? false) : false
   const isLoud = currentTrend ? currentTrend.max > 0 : false
 
