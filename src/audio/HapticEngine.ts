@@ -12,7 +12,7 @@ import {
 } from './analyzeAudio'
 
 export class HapticEngine {
-  private readonly _opts: HapticOptions
+  private _opts: HapticOptions
   private _channelData: Float32Array | null = null
   private _sampleRate: number = 44100
   private _duration: number = 0
@@ -52,6 +52,12 @@ export class HapticEngine {
     this._storeResult(result)
   }
 
+  /** Convenience: analyze + attach in one call. Set audioEl.src yourself before calling play(). */
+  async load(url: string, audioEl: HTMLAudioElement, onTick?: (time: number) => void): Promise<void> {
+    await this.analyze(url)
+    this.attach(audioEl, onTick)
+  }
+
   /** For when the user already has raw audio bytes (file input, drag-and-drop, WebSocket, etc.) */
   async analyzeBuffer(arrayBuffer: ArrayBuffer): Promise<void> {
     const result = await decodeAudioBuffer(arrayBuffer)
@@ -84,10 +90,9 @@ export class HapticEngine {
     this._lastInterruption = performance.now()
 
     const onPause = () => {
-      if (this._wasVibrating) {
-        navigator.vibrate(0)
-        this._wasVibrating = false
-      }
+      navigator.vibrate(0)
+      this._wasVibrating = false
+      this._lastInterruption = performance.now()
     }
 
     const onSeeked = () => {
@@ -115,7 +120,7 @@ export class HapticEngine {
         const muteWindowMs = (this._outputLatency + this._baseLatency) * 1000
         const inMuteWindow = performance.now() - this._lastInterruption < muteWindowMs
 
-        if (this._trends.length > 0 && !inMuteWindow) {
+        if (this._trends.length > 0 && !inMuteWindow && !this._audioEl.paused) {
           const bucketIndex = Math.floor((currentTime * this._sampleRate) / bucketSize)
           const shouldVib = this._vibrationMap[bucketIndex] ?? false
 
