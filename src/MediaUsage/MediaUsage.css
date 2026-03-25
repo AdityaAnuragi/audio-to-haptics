@@ -1,0 +1,11 @@
+.media-usage {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.media-usage input {
+  width: 100%;
+  box-sizing: border-box;
+}
