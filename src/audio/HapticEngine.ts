@@ -27,7 +27,7 @@ export class HapticEngine {
   private _rafId = 0
   private _wasVibrating = false
   private _lastInterruption = 0
-  private _audioEl: HTMLAudioElement | null = null
+  private _audioEl: HTMLMediaElement | null = null
   private _onTick: ((time: number) => void) | null = null
   private _cleanup: (() => void) | null = null
 
@@ -53,9 +53,9 @@ export class HapticEngine {
   }
 
   /** Convenience: analyze + attach in one call. Set audioEl.src yourself before calling play(). */
-  async load(url: string, audioEl: HTMLAudioElement, onTick?: (time: number) => void): Promise<void> {
+  async load(url: string, mediaEl: HTMLMediaElement, onTick?: (time: number) => void): Promise<void> {
     await this.analyze(url)
-    this.attach(audioEl, onTick)
+    this.attach(mediaEl, onTick)
   }
 
   /** For when the user already has raw audio bytes (file input, drag-and-drop, WebSocket, etc.) */
@@ -83,9 +83,9 @@ export class HapticEngine {
     console.log(`[noise floor] peak=${peak}, noiseFloor=${this._noiseFloor.toFixed(4)}, buckets: ${total} total, ${silent} silent, ${belowFloor} below floor (${(belowFloor/total*100).toFixed(1)}% filtered), ${total - silent - belowFloor} above floor`)
   }
 
-  attach(audioEl: HTMLAudioElement, onTick?: (time: number) => void): void {
+  attach(mediaEl: HTMLMediaElement, onTick?: (time: number) => void): void {
     this.detach()
-    this._audioEl = audioEl
+    this._audioEl = mediaEl
     this._onTick = onTick ?? null
     this._lastInterruption = performance.now()
 
@@ -103,12 +103,12 @@ export class HapticEngine {
       this._lastInterruption = performance.now()
     }
 
-    audioEl.addEventListener('pause', onPause)
-    audioEl.addEventListener('seeked', onSeeked)
+    mediaEl.addEventListener('pause', onPause)
+    mediaEl.addEventListener('seeked', onSeeked)
 
     this._cleanup = () => {
-      audioEl.removeEventListener('pause', onPause)
-      audioEl.removeEventListener('seeked', onSeeked)
+      mediaEl.removeEventListener('pause', onPause)
+      mediaEl.removeEventListener('seeked', onSeeked)
     }
 
     const bucketSize = this._opts.bucketSize
