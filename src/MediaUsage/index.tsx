@@ -1,8 +1,7 @@
 import { useRef, useState } from 'react'
 import { HapticEngine } from '../audio/HapticEngine'
+import { DEFAULT_OPTIONS } from '../audio/analyzeAudio'
 import './MediaUsage.css'
-
-const engine = new HapticEngine()
 
 const URLS = {
   video: '/video/chippinIn.mp4',
@@ -11,8 +10,13 @@ const URLS = {
 
 export function MediaUsage() {
   const mediaRef = useRef<HTMLMediaElement | null>(null)
+  const engineRef = useRef(new HapticEngine())
   const [url, setUrl] = useState<typeof URLS[keyof typeof URLS]>(URLS.audio)
   const [status, setStatus] = useState<'idle' | 'analyzing' | 'ready'>('idle')
+  const [spikeRatio, setSpikeRatio] = useState(DEFAULT_OPTIONS.spikeRatio)
+  const [neighborRadius, setNeighborRadius] = useState(DEFAULT_OPTIONS.neighborRadius)
+  const [sustainThreshold, setSustainThreshold] = useState(DEFAULT_OPTIONS.sustainThreshold)
+  const [vibrateThresholdRatio, setVibrateThresholdRatio] = useState(DEFAULT_OPTIONS.vibrateThresholdRatio)
 
   function handleToggle() {
     setUrl(u => u === URLS.video ? URLS.audio : URLS.video)
@@ -21,7 +25,8 @@ export function MediaUsage() {
 
   async function handleAnalyze() {
     setStatus('analyzing')
-    await engine.load(url, mediaRef.current!)
+    engineRef.current = new HapticEngine({ spikeRatio, neighborRadius, sustainThreshold, vibrateThresholdRatio })
+    await engineRef.current.load(url, mediaRef.current!)
     setStatus('ready')
   }
 
@@ -37,6 +42,19 @@ export function MediaUsage() {
       <button onClick={handleToggle}>
         Switch to {url === URLS.video ? 'Audio' : 'Video'}
       </button>
+      <label>spikeRatio: {spikeRatio}
+        <input type="range" min={1.0} max={3.0} step={0.1} value={spikeRatio} onChange={e => setSpikeRatio(Number(e.target.value))} />
+      </label>
+      <label>neighborRadius: {neighborRadius}
+        <input type="range" min={1} max={10} step={1} value={neighborRadius} onChange={e => setNeighborRadius(Number(e.target.value))} />
+      </label>
+      <label>sustainThreshold: {sustainThreshold}
+        <input type="range" min={0} max={1.0} step={0.05} value={sustainThreshold} onChange={e => setSustainThreshold(Number(e.target.value))} />
+      </label>
+      <label>vibrateThresholdRatio: {vibrateThresholdRatio}
+        <input type="range" min={0.1} max={0.9} step={0.05} value={vibrateThresholdRatio} onChange={e => setVibrateThresholdRatio(Number(e.target.value))} />
+      </label>
+
       <button onClick={handleAnalyze} disabled={status === 'analyzing'}>
         {status === 'analyzing' ? 'Analyzing...' : 'Enable Haptics'}
       </button>
