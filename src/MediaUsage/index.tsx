@@ -6,12 +6,12 @@ const engine = new HapticEngine()
 
 const URLS = {
   video: '/video/chippinIn.mp4',
-  audio: 'https://cdn.pixabay.com/audio/2022/03/24/audio_51594bdccc.mp3',
+  audio: 'https://cdn.pixabay.com/audio/2022/11/05/audio_997c8fe344.mp3',
 } as const
 
 export function MediaUsage() {
   const mediaRef = useRef<HTMLMediaElement | null>(null)
-  const [url, setUrl] = useState<typeof URLS[keyof typeof URLS]>(URLS.video)
+  const [url, setUrl] = useState<typeof URLS[keyof typeof URLS]>(URLS.audio)
   const [status, setStatus] = useState<'idle' | 'analyzing' | 'ready'>('idle')
 
   function handleToggle() {
