@@ -17,6 +17,7 @@ export function MediaUsage() {
   const [neighborRadius, setNeighborRadius] = useState(DEFAULT_OPTIONS.neighborRadius)
   const [sustainThreshold, setSustainThreshold] = useState(DEFAULT_OPTIONS.sustainThreshold)
   const [vibrateThresholdRatio, setVibrateThresholdRatio] = useState(DEFAULT_OPTIONS.vibrateThresholdRatio)
+  const [muted, setMuted] = useState(false)
 
   function handleToggle() {
     setUrl(u => u === URLS.video ? URLS.audio : URLS.video)
@@ -54,6 +55,10 @@ export function MediaUsage() {
       <label>vibrateThresholdRatio: {vibrateThresholdRatio}
         <input type="range" min={0.1} max={0.9} step={0.05} value={vibrateThresholdRatio} onChange={e => setVibrateThresholdRatio(Number(e.target.value))} />
       </label>
+
+      <button onClick={() => { engineRef.current.toggleMuted(); setMuted(m => !m) }} disabled={status !== 'ready'}>
+        {muted ? 'Unmute Haptics' : 'Mute Haptics'}
+      </button>
 
       <button onClick={handleAnalyze} disabled={status === 'analyzing'}>
         {status === 'analyzing' ? 'Analyzing...' : 'Enable Haptics'}

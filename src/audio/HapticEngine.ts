@@ -24,6 +24,7 @@ export class HapticEngine {
   private _noiseFloor: number = 0
   private _pattern: number[] = []
 
+  private _muted = false
   private _rafId = 0
   private _wasVibrating = false
   private _lastInterruption = 0
@@ -45,6 +46,9 @@ export class HapticEngine {
   get vibrationMap(): boolean[] { return [...this._vibrationMap] }
   get noiseFloor(): number { return this._noiseFloor }
   get bucketSize(): number { return this._opts.bucketSize }
+  get muted(): boolean { return this._muted }
+  set muted(value: boolean) { this._muted = value }
+  toggleMuted(): void { this._muted = !this._muted }
   get pattern(): number[] { return [...this._pattern] }
 
   async analyze(url: string): Promise<void> {
@@ -133,7 +137,7 @@ export class HapticEngine {
           const bucketIndex = Math.floor((currentTime * this._sampleRate) / bucketSize)
           const shouldVib = this._vibrationMap[bucketIndex] ?? false
 
-          if (shouldVib) {
+          if (shouldVib && !this._muted) {
             navigator.vibrate(Math.round(bucketSize / this._sampleRate * 1000))
             this._wasVibrating = true
           } else if (this._wasVibrating) {
