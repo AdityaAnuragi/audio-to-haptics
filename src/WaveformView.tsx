@@ -97,9 +97,13 @@ export default function WaveformView({channelData, sampleRate, trends, vibration
       const x2 = pad.left + ((Math.min(t.endIndex, windowEnd - 1) - offset) / windowLen) * plotW
 
       const intensity = computeIntensity(t.max, noiseFloor)
-      ctx.fillStyle = `rgba(0, 255, 255, ${(0.05 + intensity * 0.4).toFixed(2)})`
+      // low → cyan, mid → yellow, high → red
+      const r = Math.round(intensity < 0.5 ? intensity * 2 * 255 : 255)
+      const g = Math.round(intensity < 0.5 ? 255 : (1 - (intensity - 0.5) * 2) * 255)
+      const b = Math.round(intensity < 0.5 ? 255 * (1 - intensity * 2) : 0)
+      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${(0.1 + intensity * 0.3).toFixed(2)})`
       ctx.fillRect(x1, pad.top, x2 - x1, plotH)
-      ctx.strokeStyle = `rgba(0, 255, 255, ${(0.2 + intensity * 0.6).toFixed(2)})`
+      ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${(0.3 + intensity * 0.5).toFixed(2)})`
       ctx.lineWidth = 1
       ctx.strokeRect(x1, pad.top, x2 - x1, plotH)
     }
@@ -184,7 +188,7 @@ export default function WaveformView({channelData, sampleRate, trends, vibration
       <h3>Waveform</h3>
       <p style={{fontSize: '12px', color: '#888', margin: '4px 0'}}>
         Viewing {startMs}ms – {endMs}ms (window: {windowMs}ms)
-        {' | '}<span style={{color: 'cyan'}}>cyan = vibration</span>
+        {' | '}<span style={{color: 'cyan'}}>cyan</span>/<span style={{color: 'yellow'}}>yellow</span>/<span style={{color: 'red'}}>red</span> = vibration (low→high intensity)
         {' | '}<span style={{color: 'rgba(255, 100, 100, 0.6)'}}>dashed = threshold ({noiseFloor})</span>
       </p>
       <canvas
