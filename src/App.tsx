@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react'
 import './App.css'
-import {type Trend, classifyLoudness, DEFAULT_OPTIONS} from './audio/analyzeAudio'
+import {type Trend, classifyLoudness, computeIntensity, intensityToPattern, DEFAULT_OPTIONS} from './audio/analyzeAudio'
 import {HapticEngine} from './audio/HapticEngine'
 import WaveformView from './WaveformView'
 
@@ -61,10 +61,12 @@ interface Analysis {
   noiseFloor: number
   bucketSize: number
   pattern: number[]
+  chainEndTime: number[]
+  chainIntensity: number[]
 }
 
 function App() {
-  const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2022/11/05/audio_997c8fe344.mp3')
+  const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2022/03/24/audio_51594bdccc.mp3')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [analysis, setAnalysis] = useState<Analysis | null>(null)
@@ -116,6 +118,8 @@ function App() {
         noiseFloor: engine.noiseFloor,
         bucketSize: engine.bucketSize,
         pattern: engine.pattern,
+        chainEndTime: engine.chainEndTime,
+        chainIntensity: engine.chainIntensity,
       })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unknown error')
@@ -221,6 +225,15 @@ function App() {
   )
 }
 
+function formatPattern(pattern: number[]): string {
+  if (pattern.length === 1) return `[${pattern[0]}ms]`
+  const on = pattern[0], gap = pattern[1]
+  const repeats = Math.floor(pattern.length / 2)
+  const lastGap = pattern[pattern.length - 1]
+  const gapStr = lastGap !== gap ? `~${gap}` : `${gap}`
+  return `[${on}, ${gapStr}] ×${repeats}`
+}
+
 function ResultView({analysis, trends, vibrationMap, pattern}: { analysis: Analysis; trends: Trend[]; vibrationMap: boolean[]; pattern: number[] }) {
   return (
     <div style={{textAlign: 'left'}}>
@@ -252,28 +265,34 @@ function ResultView({analysis, trends, vibrationMap, pattern}: { analysis: Analy
 
       <h3>Trends (absolute values)</h3>
       {(() => {
-        const vibrateTrends = trends.filter((_, i) => vibrationMap[i])
+        const vibrateCount = vibrationMap.filter(Boolean).length
         return <>
-          <p style={{fontSize: '12px', color: '#888'}}>{vibrateTrends.length} vibrate-worthy trends</p>
+          <p style={{fontSize: '12px', color: '#888'}}>{vibrateCount} vibrate-worthy trends</p>
           <div style={{maxHeight: '400px', overflow: 'auto', fontSize: '13px', fontFamily: 'monospace'}}>
-            {vibrateTrends.map((t, i) => (
-              <div key={i} style={{padding: '2px 0'}}>
-                {t.startTime.toFixed(2)}s – {t.endTime.toFixed(2)}s{' '}
-                <span style={{color: '#888'}}>
-              [{t.startIndex.toLocaleString()} – {t.endIndex.toLocaleString()}]
-            </span>{' '}
-                {(() => {
-                  const {label, color} = classifyLoudness(t.max)
-                  const diff = Math.round((t.rightRms - t.leftRms) * 1000) / 1000
-                  return <>
-                    <span style={{color}}>{label}</span>
-                    {` (${t.min} – ${t.max})`}
-                    {' '}<span style={{color: '#888'}}>L:{t.leftRms} R:{t.rightRms} ({diff >= 0 ? '+' : ''}{diff})</span>
-                    {' '}<span style={{color: '#0ff', fontWeight: 'bold'}}>VIBRATE</span>
-                  </>
-                })()}
-              </div>
-            ))}
+            {trends.map((t, i) => {
+              if (!vibrationMap[i]) return null
+              const intensity = computeIntensity(t.max, analysis.noiseFloor)
+              const {label, color} = classifyLoudness(t.max)
+              const diff = Math.round((t.rightRms - t.leftRms) * 1000) / 1000
+              const r = Math.round(intensity < 0.5 ? intensity * 2 * 255 : 255)
+              const g = Math.round(intensity < 0.5 ? 255 : (1 - (intensity - 0.5) * 2) * 255)
+              const b = Math.round(intensity < 0.5 ? 255 * (1 - intensity * 2) : 0)
+              const isChainStart = !vibrationMap[i - 1]
+              const chainPattern = isChainStart
+                ? formatPattern(intensityToPattern(Math.round((analysis.chainEndTime[i] - t.startTime) * 1000), analysis.chainIntensity[i]))
+                : null
+              return (
+                <div key={i} style={{padding: '2px 0'}}>
+                  {t.startTime.toFixed(2)}s – {t.endTime.toFixed(2)}s{' '}
+                  <span style={{color: '#888'}}>[{t.startIndex.toLocaleString()} – {t.endIndex.toLocaleString()}]</span>{' '}
+                  <span style={{color}}>{label}</span>
+                  {` (${t.min} – ${t.max})`}
+                  {' '}<span style={{color: '#888'}}>L:{t.leftRms} R:{t.rightRms} ({diff >= 0 ? '+' : ''}{diff})</span>
+                  {' '}<span style={{color: `rgb(${r},${g},${b})`, fontWeight: 'bold'}}>{Math.round(intensity * 100)}%{intensity < 0.35 ? <span style={{color: '#888'}}> →35%</span> : null}</span>
+                  {chainPattern && <span style={{color: '#888'}}> {chainPattern}</span>}
+                </div>
+              )
+            })}
           </div>
         </>
       })()}

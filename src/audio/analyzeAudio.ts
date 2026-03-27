@@ -172,16 +172,47 @@ export function computeIntensity(trendMax: number, noiseFloor: number): number {
 }
 
 export function intensityToPattern(durationMs: number, intensity: number): number[] {
-  if (intensity >= 1) return [durationMs]
-  const cycleMs = 20
-  const cycles = Math.round(durationMs / cycleMs)
-  if (cycles === 0) return [durationMs]
-  const onMs = Math.round(cycleMs * intensity)
-  const offMs = cycleMs - onMs
-  if (offMs === 0) return [durationMs]
+  const clamped = Math.max(0.35, Math.min(1, intensity))
+  if (clamped >= 1) return [durationMs]
+  const onMs = 40
+  const cycleMs = onMs / clamped
+  const gapMs = cycleMs - onMs
+  const numCycles = Math.floor(durationMs / cycleMs)
+  if (numCycles === 0) return [onMs]
+  const remainder = durationMs - numCycles * cycleMs
   const pattern: number[] = []
-  for (let i = 0; i < cycles; i++) pattern.push(onMs, offMs)
+  for (let i = 0; i < numCycles; i++) pattern.push(onMs, Math.round(gapMs))
+  pattern[pattern.length - 1] = Math.round(gapMs + remainder)
   return pattern
+}
+
+export function computeChainData(trends: Trend[], vibrationMap: boolean[], opts: HapticOptions = DEFAULT_OPTIONS): { chainEndTime: number[], chainIntensity: number[] } {
+  const noiseFloor = computeNoiseFloor(trends, opts)
+  const chainEndTime: number[] = new Array(trends.length).fill(0)
+  const chainIntensity: number[] = new Array(trends.length).fill(0)
+
+  let i = 0
+  while (i < trends.length) {
+    if (!vibrationMap[i]) { i++; continue }
+
+    let j = i
+    while (j < trends.length && vibrationMap[j]) j++
+    // run covers i..j-1
+
+    const endTime = trends[j - 1].endTime
+    let sum = 0
+    for (let k = i; k < j; k++) sum += computeIntensity(trends[k].max, noiseFloor)
+    const avgIntensity = sum / (j - i)
+
+    for (let k = i; k < j; k++) {
+      chainEndTime[k] = endTime
+      chainIntensity[k] = avgIntensity
+    }
+
+    i = j
+  }
+
+  return { chainEndTime, chainIntensity }
 }
 
 export function classifyLoudness(max: number): { label: string; color: string } {

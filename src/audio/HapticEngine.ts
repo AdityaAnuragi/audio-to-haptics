@@ -5,7 +5,7 @@ import {
   computeVibrationMap,
   computeNoiseFloor,
   trendsToVibrationPattern,
-  computeIntensity,
+  computeChainData,
   intensityToPattern,
   type AnalysisResult,
   type Trend,
@@ -25,6 +25,8 @@ export class HapticEngine {
   private _vibrationMap: boolean[] = []
   private _noiseFloor: number = 0
   private _pattern: number[] = []
+  private _chainEndTime: number[] = []
+  private _chainIntensity: number[] = []
 
   private _muted = false
   private _rafId = 0
@@ -47,6 +49,8 @@ export class HapticEngine {
   get trends(): Trend[] { return structuredClone(this._trends) }
   get vibrationMap(): boolean[] { return [...this._vibrationMap] }
   get noiseFloor(): number { return this._noiseFloor }
+  get chainEndTime(): number[] { return [...this._chainEndTime] }
+  get chainIntensity(): number[] { return [...this._chainIntensity] }
   get bucketSize(): number { return this._opts.bucketSize }
   get muted(): boolean { return this._muted }
   set muted(value: boolean) { this._muted = value }
@@ -81,6 +85,9 @@ export class HapticEngine {
     this._vibrationMap = computeVibrationMap(this._trends, this._opts)
     this._noiseFloor = computeNoiseFloor(this._trends, this._opts)
     this._pattern = trendsToVibrationPattern(this._trends, this._vibrationMap)
+    const { chainEndTime, chainIntensity } = computeChainData(this._trends, this._vibrationMap, this._opts)
+    this._chainEndTime = chainEndTime
+    this._chainIntensity = chainIntensity
 
     const peak = this._trends.reduce((max, t) => Math.max(max, t.max), 0)
     const belowFloor = this._trends.filter(t => t.max > 0 && t.max < this._noiseFloor).length
@@ -140,10 +147,11 @@ export class HapticEngine {
           const shouldVib = this._vibrationMap[bucketIndex] ?? false
 
           if (shouldVib && !this._muted) {
-            const durationMs = Math.round(bucketSize / this._sampleRate * 1000)
-            const intensity = computeIntensity(this._trends[bucketIndex].max, this._noiseFloor)
-            navigator.vibrate(intensityToPattern(durationMs, intensity))
-            this._wasVibrating = true
+            if (!this._wasVibrating) {
+              const remainingMs = Math.max(60, Math.round((this._chainEndTime[bucketIndex] - currentTime) * 1000))
+              navigator.vibrate(intensityToPattern(remainingMs, this._chainIntensity[bucketIndex]))
+              this._wasVibrating = true
+            }
           } else if (this._wasVibrating) {
             navigator.vibrate(0)
             this._wasVibrating = false
