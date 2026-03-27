@@ -15,7 +15,8 @@ export interface HapticOptions {
   vibrateThresholdMin: number   // absolute minimum floor (prevents triggering on digital silence)
   neighborRadius: number        // look at N buckets in the past (~240ms at 60ms/bucket)
   spikeRatio: number            // must be this much louder than past neighbor average
-  sustainThreshold: number      // minimum ratio of current to previous max to sustain vibration through decay
+  sustainLowerBound: number     // minimum ratio of current to previous max to sustain vibration through decay
+  sustainUpperBound: number     // maximum ratio of current to previous max to sustain (blocks rising sections)
 }
 
 export const DEFAULT_OPTIONS: HapticOptions = {
@@ -24,7 +25,8 @@ export const DEFAULT_OPTIONS: HapticOptions = {
   vibrateThresholdMin: 0.040,
   neighborRadius: 4,
   spikeRatio: 1.5,
-  sustainThreshold: 0.75,
+  sustainLowerBound: 0.75,
+  sustainUpperBound: 1.01,
 }
 
 // export const BUCKET_SIZE = DEFAULT_OPTIONS.bucketSize
@@ -33,7 +35,8 @@ export const DEFAULT_OPTIONS: HapticOptions = {
 // export const NEIGHBOR_RADIUS = DEFAULT_OPTIONS.neighborRadius
 // export const SPIKE_RATIO = DEFAULT_OPTIONS.spikeRatio
 // export const PREVIOUS_WEIGHT = 0.5 // redundant with past-only comparison — asymmetry is already achieved by dropping future neighbors
-// export const SUSTAIN_THRESHOLD = DEFAULT_OPTIONS.sustainThreshold
+// export const SUSTAIN_LOWER_BOUND = DEFAULT_OPTIONS.sustainLowerBound
+// export const SUSTAIN_UPPER_BOUND = DEFAULT_OPTIONS.sustainUpperBound
 
 export function computeNoiseFloor(trends: Trend[], opts: HapticOptions = DEFAULT_OPTIONS): number {
   const peakAmplitude = trends.reduce((max, t) => Math.max(max, t.max), 0)
@@ -52,10 +55,7 @@ export function computeVibrationMap(trends: Trend[], opts: HapticOptions = DEFAU
     let vibrate = false
     if (i > 0 && result[i - 1]) {
       const prev = trends[i - 1].max
-      if (
-        // t.max <= prev &&
-        t.max >= prev * opts.sustainThreshold
-      ) {
+      if (t.max >= prev * opts.sustainLowerBound && t.max <= prev * opts.sustainUpperBound) {
         vibrate = true
         console.log(`[${i}] sustained: max=${t.max} prev=${prev} pct=${(t.max / prev * 100).toFixed(1)}%`)
       }

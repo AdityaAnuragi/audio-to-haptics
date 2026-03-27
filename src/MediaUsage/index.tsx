@@ -15,7 +15,8 @@ export function MediaUsage() {
   const [status, setStatus] = useState<'idle' | 'analyzing' | 'ready'>('idle')
   const [spikeRatio, setSpikeRatio] = useState(DEFAULT_OPTIONS.spikeRatio)
   const [neighborRadius, setNeighborRadius] = useState(DEFAULT_OPTIONS.neighborRadius)
-  const [sustainThreshold, setSustainThreshold] = useState(DEFAULT_OPTIONS.sustainThreshold)
+  const [sustainLowerBound, setSustainLowerBound] = useState(DEFAULT_OPTIONS.sustainLowerBound)
+  const [sustainUpperBound, setSustainUpperBound] = useState(DEFAULT_OPTIONS.sustainUpperBound)
   const [vibrateThresholdRatio, setVibrateThresholdRatio] = useState(DEFAULT_OPTIONS.vibrateThresholdRatio)
   const [muted, setMuted] = useState(false)
 
@@ -26,7 +27,7 @@ export function MediaUsage() {
 
   async function handleAnalyze() {
     setStatus('analyzing')
-    engineRef.current = new HapticEngine({ spikeRatio, neighborRadius, sustainThreshold, vibrateThresholdRatio })
+    engineRef.current = new HapticEngine({ spikeRatio, neighborRadius, sustainLowerBound, sustainUpperBound, vibrateThresholdRatio })
     await engineRef.current.load(url, mediaRef.current!)
     setStatus('ready')
   }
@@ -49,8 +50,11 @@ export function MediaUsage() {
       <label>neighborRadius: {neighborRadius}
         <input type="range" min={1} max={10} step={1} value={neighborRadius} onChange={e => setNeighborRadius(Number(e.target.value))} />
       </label>
-      <label>sustainThreshold: {sustainThreshold}
-        <input type="range" min={0} max={1.0} step={0.05} value={sustainThreshold} onChange={e => setSustainThreshold(Number(e.target.value))} />
+      <label>sustainLowerBound: {sustainLowerBound}
+        <input type="range" min={0} max={1.0} step={0.05} value={sustainLowerBound} onChange={e => setSustainLowerBound(Number(e.target.value))} />
+      </label>
+      <label>sustainUpperBound: {sustainUpperBound}
+        <input type="range" min={1.0} max={1.5} step={0.05} value={sustainUpperBound} onChange={e => setSustainUpperBound(Number(e.target.value))} />
       </label>
       <label>vibrateThresholdRatio: {vibrateThresholdRatio}
         <input type="range" min={0.1} max={0.9} step={0.05} value={vibrateThresholdRatio} onChange={e => setVibrateThresholdRatio(Number(e.target.value))} />
