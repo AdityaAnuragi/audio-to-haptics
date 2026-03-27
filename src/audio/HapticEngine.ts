@@ -5,6 +5,8 @@ import {
   computeVibrationMap,
   computeNoiseFloor,
   trendsToVibrationPattern,
+  computeIntensity,
+  intensityToPattern,
   type AnalysisResult,
   type Trend,
   type HapticOptions,
@@ -138,7 +140,9 @@ export class HapticEngine {
           const shouldVib = this._vibrationMap[bucketIndex] ?? false
 
           if (shouldVib && !this._muted) {
-            navigator.vibrate(Math.round(bucketSize / this._sampleRate * 1000))
+            const durationMs = Math.round(bucketSize / this._sampleRate * 1000)
+            const intensity = computeIntensity(this._trends[bucketIndex].max, this._noiseFloor)
+            navigator.vibrate(intensityToPattern(durationMs, intensity))
             this._wasVibrating = true
           } else if (this._wasVibrating) {
             navigator.vibrate(0)

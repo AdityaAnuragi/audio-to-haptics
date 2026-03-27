@@ -52,7 +52,10 @@ export function computeVibrationMap(trends: Trend[], opts: HapticOptions = DEFAU
     let vibrate = false
     if (i > 0 && result[i - 1]) {
       const prev = trends[i - 1].max
-      if (t.max < prev && t.max >= prev * opts.sustainThreshold) {
+      if (
+        // t.max <= prev &&
+        t.max >= prev * opts.sustainThreshold
+      ) {
         vibrate = true
         console.log(`[${i}] sustained: max=${t.max} prev=${prev} pct=${(t.max / prev * 100).toFixed(1)}%`)
       }
@@ -162,6 +165,23 @@ export function trendsToVibrationPattern(trends: Trend[], vibrationMap: boolean[
   }
 
   return segments.map((s) => s.ms)
+}
+
+export function computeIntensity(trendMax: number, noiseFloor: number): number {
+  return Math.max(0, Math.min(1, (trendMax - noiseFloor) / (1 - noiseFloor)))
+}
+
+export function intensityToPattern(durationMs: number, intensity: number): number[] {
+  if (intensity >= 1) return [durationMs]
+  const cycleMs = 20
+  const cycles = Math.round(durationMs / cycleMs)
+  if (cycles === 0) return [durationMs]
+  const onMs = Math.round(cycleMs * intensity)
+  const offMs = cycleMs - onMs
+  if (offMs === 0) return [durationMs]
+  const pattern: number[] = []
+  for (let i = 0; i < cycles; i++) pattern.push(onMs, offMs)
+  return pattern
 }
 
 export function classifyLoudness(max: number): { label: string; color: string } {

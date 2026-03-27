@@ -1,5 +1,5 @@
 import {useRef, useState, useEffect} from 'react'
-import {type Trend, DEFAULT_OPTIONS} from './audio/analyzeAudio'
+import {type Trend, DEFAULT_OPTIONS, computeIntensity} from './audio/analyzeAudio'
 
 interface WaveformViewProps {
   channelData: Float32Array
@@ -96,9 +96,10 @@ export default function WaveformView({channelData, sampleRate, trends, vibration
       const x1 = pad.left + ((Math.max(t.startIndex, offset) - offset) / windowLen) * plotW
       const x2 = pad.left + ((Math.min(t.endIndex, windowEnd - 1) - offset) / windowLen) * plotW
 
-      ctx.fillStyle = 'rgba(0, 255, 255, 0.15)'
+      const intensity = computeIntensity(t.max, noiseFloor)
+      ctx.fillStyle = `rgba(0, 255, 255, ${(0.05 + intensity * 0.4).toFixed(2)})`
       ctx.fillRect(x1, pad.top, x2 - x1, plotH)
-      ctx.strokeStyle = 'rgba(0, 255, 255, 0.5)'
+      ctx.strokeStyle = `rgba(0, 255, 255, ${(0.2 + intensity * 0.6).toFixed(2)})`
       ctx.lineWidth = 1
       ctx.strokeRect(x1, pad.top, x2 - x1, plotH)
     }
