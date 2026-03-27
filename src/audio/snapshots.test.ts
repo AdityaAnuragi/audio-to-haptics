@@ -1,6 +1,6 @@
 import {describe, test, expect} from 'vitest'
 import {computeVibrationMap, trendsToVibrationPattern} from './analyzeAudio'
-import {bike, beepBeep, sniper, deathMetal, chippinIn} from './fixtures'
+import {bike, beepBeep, sniper, deathMetal, chippinIn, heartBeat} from './fixtures'
 
 describe('bike', () => {
   test('vibration map matches expected', () => {
@@ -64,5 +64,18 @@ describe('chippin in', () => {
     const vibrationMap = computeVibrationMap(chippinIn.trends)
     const pattern = trendsToVibrationPattern(chippinIn.trends, vibrationMap)
     expect(pattern).toEqual(chippinIn.expectedVibrationPattern)
+  })
+})
+
+describe('heart beat', () => {
+  test('vibration map matches expected', () => {
+    const vibrationMap = computeVibrationMap(heartBeat.trends)
+    expect(vibrationMap).toEqual(heartBeat.expectedVibrationMap)
+  })
+
+  test('vibration pattern matches expected', () => {
+    const vibrationMap = computeVibrationMap(heartBeat.trends)
+    const pattern = trendsToVibrationPattern(heartBeat.trends, vibrationMap)
+    expect(pattern).toEqual(heartBeat.expectedVibrationPattern)
   })
 })
