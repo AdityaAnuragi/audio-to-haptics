@@ -148,8 +148,13 @@ export class HapticEngine {
 
           if (shouldVib && !this._muted) {
             if (!this._wasVibrating) {
-              const remainingMs = Math.max(60, Math.round((this._chainEndTime[bucketIndex] - currentTime) * 1000))
-              navigator.vibrate(intensityToPattern(remainingMs, this._chainIntensity[bucketIndex]))
+              const bucketDurationMs = Math.round(bucketSize / this._sampleRate * 1000)
+              const remainingMs = Math.max(bucketDurationMs, Math.round((this._chainEndTime[bucketIndex] - currentTime) * 1000))
+              const shortChainMs = this._opts.shortChainBuckets * bucketDurationMs
+              const pattern = remainingMs < shortChainMs
+                ? [remainingMs]
+                : intensityToPattern(remainingMs, this._chainIntensity[bucketIndex])
+              navigator.vibrate(pattern)
               this._wasVibrating = true
             }
           } else if (this._wasVibrating) {

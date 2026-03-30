@@ -279,8 +279,11 @@ function ResultView({analysis, trends, vibrationMap, pattern}: { analysis: Analy
               const b = Math.round(intensity < 0.5 ? 255 * (1 - intensity * 2) : 0)
               const isChainStart = !vibrationMap[i - 1]
               const bucketDurationMs = Math.round(analysis.bucketSize / analysis.sampleRate * 1000)
+              const remainingMs = Math.max(bucketDurationMs, Math.round((analysis.chainEndTime[i] - t.startTime) * 1000))
+              const shortChainMs = DEFAULT_OPTIONS.shortChainBuckets * bucketDurationMs
+              const isShortChain = remainingMs < shortChainMs
               const chainPattern = isChainStart
-                ? formatPattern(intensityToPattern(Math.max(bucketDurationMs, Math.round((analysis.chainEndTime[i] - t.startTime) * 1000)), analysis.chainIntensity[i]))
+                ? (isShortChain ? <span style={{color: '#f90', fontWeight: 'bold'}}>MAX</span> : formatPattern(intensityToPattern(remainingMs, analysis.chainIntensity[i])))
                 : null
               return (
                 <div key={i} style={{padding: '2px 0'}}>
@@ -290,7 +293,10 @@ function ResultView({analysis, trends, vibrationMap, pattern}: { analysis: Analy
                   {` (${t.min} – ${t.max})`}
                   {' '}<span style={{color: '#888'}}>L:{t.leftRms} R:{t.rightRms} ({diff >= 0 ? '+' : ''}{diff})</span>
                   {' '}<span style={{color: `rgb(${r},${g},${b})`, fontWeight: 'bold'}}>{Math.round(intensity * 100)}%{intensity < 0.5 ? <span style={{color: '#888'}}> →50%</span> : null}</span>
-                  {chainPattern && <span style={{color: '#888'}}> {chainPattern}</span>}
+                  {isChainStart && (isShortChain
+                    ? <> <span style={{color: '#f90', fontWeight: 'bold'}}>MAX</span></>
+                    : <span style={{color: '#888'}}> {chainPattern}</span>
+                  )}
                 </div>
               )
             })}

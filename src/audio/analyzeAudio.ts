@@ -17,6 +17,7 @@ export interface HapticOptions {
   spikeRatio: number            // must be this much louder than past neighbor average
   sustainLowerBound: number     // minimum ratio of current to previous max to sustain vibration through decay
   sustainUpperBound: number     // maximum ratio of current to previous max to sustain (blocks rising sections)
+  shortChainBuckets: number     // chains shorter than this many buckets fire as a solid pulse (no PWM)
 }
 
 export const DEFAULT_OPTIONS: HapticOptions = {
@@ -27,6 +28,7 @@ export const DEFAULT_OPTIONS: HapticOptions = {
   spikeRatio: 1.5,
   sustainLowerBound: 0.75,
   sustainUpperBound: 1.01,
+  shortChainBuckets: 3,
 }
 
 // export const BUCKET_SIZE = DEFAULT_OPTIONS.bucketSize
