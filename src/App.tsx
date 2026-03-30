@@ -288,7 +288,7 @@ function ResultView({analysis, trends, vibrationMap, pattern}: { analysis: Analy
                   <span style={{color}}>{label}</span>
                   {` (${t.min} – ${t.max})`}
                   {' '}<span style={{color: '#888'}}>L:{t.leftRms} R:{t.rightRms} ({diff >= 0 ? '+' : ''}{diff})</span>
-                  {' '}<span style={{color: `rgb(${r},${g},${b})`, fontWeight: 'bold'}}>{Math.round(intensity * 100)}%{intensity < 0.35 ? <span style={{color: '#888'}}> →35%</span> : null}</span>
+                  {' '}<span style={{color: `rgb(${r},${g},${b})`, fontWeight: 'bold'}}>{Math.round(intensity * 100)}%{intensity < 0.5 ? <span style={{color: '#888'}}> →50%</span> : null}</span>
                   {chainPattern && <span style={{color: '#888'}}> {chainPattern}</span>}
                 </div>
               )

@@ -172,17 +172,18 @@ export function computeIntensity(trendMax: number, noiseFloor: number): number {
 }
 
 export function intensityToPattern(durationMs: number, intensity: number): number[] {
-  const clamped = Math.max(0.35, Math.min(1, intensity))
+  const clamped = Math.max(0.5, Math.min(1, intensity))
   if (clamped >= 1) return [durationMs]
-  const onMs = 40
-  const cycleMs = onMs / clamped
-  const gapMs = cycleMs - onMs
+  const cycleMs = 20
+  const onMs = Math.max(1, Math.round(cycleMs * clamped))
+  const offMs = cycleMs - onMs
+  if (offMs === 0) return [durationMs]
   const numCycles = Math.floor(durationMs / cycleMs)
-  if (numCycles === 0) return [onMs]
+  if (numCycles === 0) return [durationMs]
   const remainder = durationMs - numCycles * cycleMs
   const pattern: number[] = []
-  for (let i = 0; i < numCycles; i++) pattern.push(onMs, Math.round(gapMs))
-  pattern[pattern.length - 1] = Math.round(gapMs + remainder)
+  for (let i = 0; i < numCycles; i++) pattern.push(onMs, offMs)
+  pattern[pattern.length - 1] = offMs + remainder
   return pattern
 }
 
