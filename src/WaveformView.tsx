@@ -10,7 +10,6 @@ interface WaveformViewProps {
   bucketSize?: number
   playing: boolean
   playbackTime: number // seconds, from audioEl.currentTime
-  audioEl: HTMLAudioElement | null
 }
 
 const WINDOW_SAMPLES = 44100 // 1 second at 44100Hz

@@ -64,6 +64,9 @@ interface Analysis {
   chainEndTime: number[]
   chainIntensity: number[]
   chainLength: number[]
+  shortChainBuckets: number
+  intensityFloor: number
+  cycleMs: number
 }
 
 function App() {
@@ -117,11 +120,14 @@ function App() {
         trends: engine.trends,
         vibrationMap: engine.vibrationMap,
         noiseFloor: engine.noiseFloor,
-        bucketSize: engine.bucketSize,
+        bucketSize: engine.opts.bucketSize,
         pattern: engine.pattern,
         chainEndTime: engine.chainEndTime,
         chainIntensity: engine.chainIntensity,
         chainLength: engine.chainLength,
+        shortChainBuckets: engine.opts.shortChainBuckets,
+        intensityFloor: engine.opts.intensityFloor,
+        cycleMs: engine.opts.cycleMs,
       })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unknown error')
@@ -222,7 +228,7 @@ function App() {
       <VibrationTester/>
 
       {analysis && <>
-        <WaveformView channelData={analysis.channelData} sampleRate={analysis.sampleRate} trends={trends} vibrationMap={vibrationMap} noiseFloor={noiseFloor} bucketSize={bucketSize} playing={playing} playbackTime={playbackTime} audioEl={audioRef.current}/>
+        <WaveformView channelData={analysis.channelData} sampleRate={analysis.sampleRate} trends={trends} vibrationMap={vibrationMap} noiseFloor={noiseFloor} bucketSize={bucketSize} playing={playing} playbackTime={playbackTime}/>
         <ResultView analysis={analysis} trends={trends} vibrationMap={vibrationMap} pattern={pattern}/>
       </>}
     </div>
@@ -287,7 +293,7 @@ function ResultView({analysis, trends, vibrationMap, pattern}: { analysis: Analy
               const length = analysis.chainLength[startIdx]
               const avgIntensity = analysis.chainIntensity[startIdx]
               const remainingMs = Math.max(bucketDurationMs, Math.round((analysis.chainEndTime[startIdx] - first.startTime) * 1000))
-              const isShortChain = length < DEFAULT_OPTIONS.shortChainBuckets
+              const isShortChain = length < analysis.shortChainBuckets
               const r = Math.round(avgIntensity < 0.5 ? avgIntensity * 2 * 255 : 255)
               const g = Math.round(avgIntensity < 0.5 ? 255 : (1 - (avgIntensity - 0.5) * 2) * 255)
               const b = Math.round(avgIntensity < 0.5 ? 255 * (1 - avgIntensity * 2) : 0)
@@ -295,10 +301,10 @@ function ResultView({analysis, trends, vibrationMap, pattern}: { analysis: Analy
                 <div key={startIdx} style={{padding: '2px 0'}}>
                   {first.startTime.toFixed(2)}s – {last.endTime.toFixed(2)}s{' '}
                   <span style={{color: '#888'}}>{length}b</span>{' '}
-                  <span style={{color: `rgb(${r},${g},${b})`, fontWeight: 'bold'}}>{Math.round(avgIntensity * 100)}%{avgIntensity < DEFAULT_OPTIONS.intensityFloor ? <span style={{color: '#888'}}> →{Math.round(DEFAULT_OPTIONS.intensityFloor * 100)}%</span> : null}</span>
+                  <span style={{color: `rgb(${r},${g},${b})`, fontWeight: 'bold'}}>{Math.round(avgIntensity * 100)}%{avgIntensity < analysis.intensityFloor ? <span style={{color: '#888'}}> →{Math.round(analysis.intensityFloor * 100)}%</span> : null}</span>
                   {' '}{isShortChain
                     ? <span style={{color: '#f90', fontWeight: 'bold'}}>MAX</span>
-                    : <span style={{color: '#888'}}>{formatPattern(intensityToPattern(remainingMs, avgIntensity))}</span>
+                    : <span style={{color: '#888'}}>{formatPattern(intensityToPattern(remainingMs, avgIntensity, {...DEFAULT_OPTIONS, intensityFloor: analysis.intensityFloor, cycleMs: analysis.cycleMs}))}</span>
                   }
                 </div>
               )

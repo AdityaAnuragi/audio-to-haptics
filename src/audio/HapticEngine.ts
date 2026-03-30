@@ -53,7 +53,7 @@ export class HapticEngine {
   get chainEndTime(): number[] { return [...this._chainEndTime] }
   get chainIntensity(): number[] { return [...this._chainIntensity] }
   get chainLength(): number[] { return [...this._chainLength] }
-  get bucketSize(): number { return this._opts.bucketSize }
+  get opts(): HapticOptions { return {...this._opts} }
   get muted(): boolean { return this._muted }
   set muted(value: boolean) { this._muted = value }
   toggleMuted(): void { this._muted = !this._muted }
