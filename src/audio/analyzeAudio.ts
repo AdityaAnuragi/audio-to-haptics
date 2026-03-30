@@ -30,8 +30,8 @@ export const DEFAULT_OPTIONS: HapticOptions = {
   spikeRatio: 1.5,
   sustainLowerBound: 0.75,
   sustainUpperBound: 1.01,
-  shortChainBuckets: 3,
-  intensityFloor: 0.4,
+  shortChainBuckets: 4,
+  intensityFloor: 0.5,
   cycleMs: 20,
 }
 
