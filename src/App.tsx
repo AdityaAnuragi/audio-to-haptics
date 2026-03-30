@@ -278,8 +278,9 @@ function ResultView({analysis, trends, vibrationMap, pattern}: { analysis: Analy
               const g = Math.round(intensity < 0.5 ? 255 : (1 - (intensity - 0.5) * 2) * 255)
               const b = Math.round(intensity < 0.5 ? 255 * (1 - intensity * 2) : 0)
               const isChainStart = !vibrationMap[i - 1]
+              const bucketDurationMs = Math.round(analysis.bucketSize / analysis.sampleRate * 1000)
               const chainPattern = isChainStart
-                ? formatPattern(intensityToPattern(Math.round((analysis.chainEndTime[i] - t.startTime) * 1000), analysis.chainIntensity[i]))
+                ? formatPattern(intensityToPattern(Math.max(bucketDurationMs, Math.round((analysis.chainEndTime[i] - t.startTime) * 1000)), analysis.chainIntensity[i]))
                 : null
               return (
                 <div key={i} style={{padding: '2px 0'}}>
