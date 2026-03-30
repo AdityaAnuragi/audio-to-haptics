@@ -295,7 +295,7 @@ function ResultView({analysis, trends, vibrationMap, pattern}: { analysis: Analy
                 <div key={startIdx} style={{padding: '2px 0'}}>
                   {first.startTime.toFixed(2)}s – {last.endTime.toFixed(2)}s{' '}
                   <span style={{color: '#888'}}>{length}b</span>{' '}
-                  <span style={{color: `rgb(${r},${g},${b})`, fontWeight: 'bold'}}>{Math.round(avgIntensity * 100)}%{avgIntensity < 0.5 ? <span style={{color: '#888'}}> →50%</span> : null}</span>
+                  <span style={{color: `rgb(${r},${g},${b})`, fontWeight: 'bold'}}>{Math.round(avgIntensity * 100)}%{avgIntensity < DEFAULT_OPTIONS.intensityFloor ? <span style={{color: '#888'}}> →{Math.round(DEFAULT_OPTIONS.intensityFloor * 100)}%</span> : null}</span>
                   {' '}{isShortChain
                     ? <span style={{color: '#f90', fontWeight: 'bold'}}>MAX</span>
                     : <span style={{color: '#888'}}>{formatPattern(intensityToPattern(remainingMs, avgIntensity))}</span>
