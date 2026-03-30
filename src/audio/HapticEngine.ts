@@ -27,6 +27,7 @@ export class HapticEngine {
   private _pattern: number[] = []
   private _chainEndTime: number[] = []
   private _chainIntensity: number[] = []
+  private _chainLength: number[] = []
 
   private _muted = false
   private _rafId = 0
@@ -51,6 +52,7 @@ export class HapticEngine {
   get noiseFloor(): number { return this._noiseFloor }
   get chainEndTime(): number[] { return [...this._chainEndTime] }
   get chainIntensity(): number[] { return [...this._chainIntensity] }
+  get chainLength(): number[] { return [...this._chainLength] }
   get bucketSize(): number { return this._opts.bucketSize }
   get muted(): boolean { return this._muted }
   set muted(value: boolean) { this._muted = value }
@@ -85,9 +87,10 @@ export class HapticEngine {
     this._vibrationMap = computeVibrationMap(this._trends, this._opts)
     this._noiseFloor = computeNoiseFloor(this._trends, this._opts)
     this._pattern = trendsToVibrationPattern(this._trends, this._vibrationMap)
-    const { chainEndTime, chainIntensity } = computeChainData(this._trends, this._vibrationMap, this._opts)
+    const { chainEndTime, chainIntensity, chainLength } = computeChainData(this._trends, this._vibrationMap, this._opts)
     this._chainEndTime = chainEndTime
     this._chainIntensity = chainIntensity
+    this._chainLength = chainLength
 
     const peak = this._trends.reduce((max, t) => Math.max(max, t.max), 0)
     const belowFloor = this._trends.filter(t => t.max > 0 && t.max < this._noiseFloor).length
@@ -150,8 +153,8 @@ export class HapticEngine {
             if (!this._wasVibrating) {
               const bucketDurationMs = Math.round(bucketSize / this._sampleRate * 1000)
               const remainingMs = Math.max(bucketDurationMs, Math.round((this._chainEndTime[bucketIndex] - currentTime) * 1000))
-              const shortChainMs = this._opts.shortChainBuckets * bucketDurationMs
-              const pattern = remainingMs < shortChainMs
+              const isShortChain = this._chainLength[bucketIndex] < this._opts.shortChainBuckets
+              const pattern = isShortChain
                 ? [remainingMs]
                 : intensityToPattern(remainingMs, this._chainIntensity[bucketIndex])
               navigator.vibrate(pattern)

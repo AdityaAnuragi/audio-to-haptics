@@ -189,10 +189,11 @@ export function intensityToPattern(durationMs: number, intensity: number): numbe
   return pattern
 }
 
-export function computeChainData(trends: Trend[], vibrationMap: boolean[], opts: HapticOptions = DEFAULT_OPTIONS): { chainEndTime: number[], chainIntensity: number[] } {
+export function computeChainData(trends: Trend[], vibrationMap: boolean[], opts: HapticOptions = DEFAULT_OPTIONS): { chainEndTime: number[], chainIntensity: number[], chainLength: number[] } {
   const noiseFloor = computeNoiseFloor(trends, opts)
   const chainEndTime: number[] = new Array(trends.length).fill(0)
   const chainIntensity: number[] = new Array(trends.length).fill(0)
+  const chainLength: number[] = new Array(trends.length).fill(0)
 
   let i = 0
   while (i < trends.length) {
@@ -203,19 +204,21 @@ export function computeChainData(trends: Trend[], vibrationMap: boolean[], opts:
     // run covers i..j-1
 
     const endTime = trends[j - 1].endTime
+    const length = j - i
     let sum = 0
     for (let k = i; k < j; k++) sum += computeIntensity(trends[k].max, noiseFloor)
-    const avgIntensity = sum / (j - i)
+    const avgIntensity = sum / length
 
     for (let k = i; k < j; k++) {
       chainEndTime[k] = endTime
       chainIntensity[k] = avgIntensity
+      chainLength[k] = length
     }
 
     i = j
   }
 
-  return { chainEndTime, chainIntensity }
+  return { chainEndTime, chainIntensity, chainLength }
 }
 
 export function classifyLoudness(max: number): { label: string; color: string } {

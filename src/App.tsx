@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react'
 import './App.css'
-import {type Trend, classifyLoudness, computeIntensity, intensityToPattern, DEFAULT_OPTIONS} from './audio/analyzeAudio'
+import {type Trend, intensityToPattern, DEFAULT_OPTIONS} from './audio/analyzeAudio'
 import {HapticEngine} from './audio/HapticEngine'
 import WaveformView from './WaveformView'
 
@@ -63,6 +63,7 @@ interface Analysis {
   pattern: number[]
   chainEndTime: number[]
   chainIntensity: number[]
+  chainLength: number[]
 }
 
 function App() {
@@ -120,6 +121,7 @@ function App() {
         pattern: engine.pattern,
         chainEndTime: engine.chainEndTime,
         chainIntensity: engine.chainIntensity,
+        chainLength: engine.chainLength,
       })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unknown error')
@@ -217,6 +219,8 @@ function App() {
 
       {error && <p style={{color: '#ff6b6b'}}>Error: {error}</p>}
 
+      <VibrationTester/>
+
       {analysis && <>
         <WaveformView channelData={analysis.channelData} sampleRate={analysis.sampleRate} trends={trends} vibrationMap={vibrationMap} noiseFloor={noiseFloor} bucketSize={bucketSize} playing={playing} playbackTime={playbackTime} audioEl={audioRef.current}/>
         <ResultView analysis={analysis} trends={trends} vibrationMap={vibrationMap} pattern={pattern}/>
@@ -263,46 +267,56 @@ function ResultView({analysis, trends, vibrationMap, pattern}: { analysis: Analy
       <p>Output Latency: {analysis.outputLatency}s ({Math.round(analysis.outputLatency * 1000)}ms)</p>
       <p>Base Latency: {analysis.baseLatency}s ({Math.round(analysis.baseLatency * 1000)}ms)</p>
 
-      <h3>Trends (absolute values)</h3>
+      <h3>Haptic Chains</h3>
       {(() => {
-        const vibrateCount = vibrationMap.filter(Boolean).length
+        const bucketDurationMs = Math.round(analysis.bucketSize / analysis.sampleRate * 1000)
+        // build chain list from vibrationMap
+        const chains: { startIdx: number; endIdx: number }[] = []
+        for (let i = 0; i < trends.length; i++) {
+          if (!vibrationMap[i] || vibrationMap[i - 1]) continue
+          let j = i
+          while (j < trends.length && vibrationMap[j]) j++
+          chains.push({ startIdx: i, endIdx: j - 1 })
+        }
         return <>
-          <p style={{fontSize: '12px', color: '#888'}}>{vibrateCount} vibrate-worthy trends</p>
+          <p style={{fontSize: '12px', color: '#888'}}>{chains.length} chains ({vibrationMap.filter(Boolean).length} buckets)</p>
           <div style={{maxHeight: '400px', overflow: 'auto', fontSize: '13px', fontFamily: 'monospace'}}>
-            {trends.map((t, i) => {
-              if (!vibrationMap[i]) return null
-              const intensity = computeIntensity(t.max, analysis.noiseFloor)
-              const {label, color} = classifyLoudness(t.max)
-              const diff = Math.round((t.rightRms - t.leftRms) * 1000) / 1000
-              const r = Math.round(intensity < 0.5 ? intensity * 2 * 255 : 255)
-              const g = Math.round(intensity < 0.5 ? 255 : (1 - (intensity - 0.5) * 2) * 255)
-              const b = Math.round(intensity < 0.5 ? 255 * (1 - intensity * 2) : 0)
-              const isChainStart = !vibrationMap[i - 1]
-              const bucketDurationMs = Math.round(analysis.bucketSize / analysis.sampleRate * 1000)
-              const remainingMs = Math.max(bucketDurationMs, Math.round((analysis.chainEndTime[i] - t.startTime) * 1000))
-              const shortChainMs = DEFAULT_OPTIONS.shortChainBuckets * bucketDurationMs
-              const isShortChain = remainingMs < shortChainMs
-              const chainPattern = isChainStart
-                ? (isShortChain ? <span style={{color: '#f90', fontWeight: 'bold'}}>MAX</span> : formatPattern(intensityToPattern(remainingMs, analysis.chainIntensity[i])))
-                : null
+            {chains.map(({ startIdx, endIdx }) => {
+              const first = trends[startIdx]
+              const last = trends[endIdx]
+              const length = analysis.chainLength[startIdx]
+              const avgIntensity = analysis.chainIntensity[startIdx]
+              const remainingMs = Math.max(bucketDurationMs, Math.round((analysis.chainEndTime[startIdx] - first.startTime) * 1000))
+              const isShortChain = length < DEFAULT_OPTIONS.shortChainBuckets
+              const r = Math.round(avgIntensity < 0.5 ? avgIntensity * 2 * 255 : 255)
+              const g = Math.round(avgIntensity < 0.5 ? 255 : (1 - (avgIntensity - 0.5) * 2) * 255)
+              const b = Math.round(avgIntensity < 0.5 ? 255 * (1 - avgIntensity * 2) : 0)
               return (
-                <div key={i} style={{padding: '2px 0'}}>
-                  {t.startTime.toFixed(2)}s – {t.endTime.toFixed(2)}s{' '}
-                  <span style={{color: '#888'}}>[{t.startIndex.toLocaleString()} – {t.endIndex.toLocaleString()}]</span>{' '}
-                  <span style={{color}}>{label}</span>
-                  {` (${t.min} – ${t.max})`}
-                  {' '}<span style={{color: '#888'}}>L:{t.leftRms} R:{t.rightRms} ({diff >= 0 ? '+' : ''}{diff})</span>
-                  {' '}<span style={{color: `rgb(${r},${g},${b})`, fontWeight: 'bold'}}>{Math.round(intensity * 100)}%{intensity < 0.5 ? <span style={{color: '#888'}}> →50%</span> : null}</span>
-                  {isChainStart && (isShortChain
-                    ? <> <span style={{color: '#f90', fontWeight: 'bold'}}>MAX</span></>
-                    : <span style={{color: '#888'}}> {chainPattern}</span>
-                  )}
+                <div key={startIdx} style={{padding: '2px 0'}}>
+                  {first.startTime.toFixed(2)}s – {last.endTime.toFixed(2)}s{' '}
+                  <span style={{color: '#888'}}>{length}b</span>{' '}
+                  <span style={{color: `rgb(${r},${g},${b})`, fontWeight: 'bold'}}>{Math.round(avgIntensity * 100)}%{avgIntensity < 0.5 ? <span style={{color: '#888'}}> →50%</span> : null}</span>
+                  {' '}{isShortChain
+                    ? <span style={{color: '#f90', fontWeight: 'bold'}}>MAX</span>
+                    : <span style={{color: '#888'}}>{formatPattern(intensityToPattern(remainingMs, avgIntensity))}</span>
+                  }
                 </div>
               )
             })}
           </div>
         </>
       })()}
+    </div>
+  )
+}
+
+function VibrationTester() {
+  const pattern = Array(100).fill([10, 10]).flat()
+  return (
+    <div style={{marginTop: '24px', textAlign: 'left'}}>
+      <h3>Vibration Tester</h3>
+      <button onClick={() => navigator.vibrate(pattern)}>Send [10, 10] ×50 ({pattern.length} entries)</button>
+      <button onClick={() => navigator.vibrate(0)} style={{marginLeft: '8px'}}>Stop</button>
     </div>
   )
 }
