@@ -156,7 +156,7 @@ export class HapticEngine {
               const isShortChain = this._chainLength[bucketIndex] < this._opts.shortChainBuckets
               const pattern = isShortChain
                 ? [remainingMs]
-                : intensityToPattern(remainingMs, this._chainIntensity[bucketIndex])
+                : intensityToPattern(remainingMs, this._chainIntensity[bucketIndex], this._opts)
               navigator.vibrate(pattern)
               this._wasVibrating = true
             }

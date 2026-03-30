@@ -18,6 +18,8 @@ export interface HapticOptions {
   sustainLowerBound: number     // minimum ratio of current to previous max to sustain vibration through decay
   sustainUpperBound: number     // maximum ratio of current to previous max to sustain (blocks rising sections)
   shortChainBuckets: number     // chains shorter than this many buckets fire as a solid pulse (no PWM)
+  intensityFloor: number        // minimum intensity passed to PWM (0–1), clamps low-intensity chains upward
+  cycleMs: number               // PWM cycle period in ms — each on/off pair sums to this value
 }
 
 export const DEFAULT_OPTIONS: HapticOptions = {
@@ -29,6 +31,8 @@ export const DEFAULT_OPTIONS: HapticOptions = {
   sustainLowerBound: 0.75,
   sustainUpperBound: 1.01,
   shortChainBuckets: 3,
+  intensityFloor: 0.4,
+  cycleMs: 20,
 }
 
 // export const BUCKET_SIZE = DEFAULT_OPTIONS.bucketSize
@@ -173,10 +177,10 @@ export function computeIntensity(trendMax: number, noiseFloor: number): number {
   return Math.max(0, Math.min(1, (trendMax - noiseFloor) / (1 - noiseFloor)))
 }
 
-export function intensityToPattern(durationMs: number, intensity: number): number[] {
-  const clamped = Math.max(0.5, Math.min(1, intensity))
+export function intensityToPattern(durationMs: number, intensity: number, opts: HapticOptions = DEFAULT_OPTIONS): number[] {
+  const clamped = Math.max(opts.intensityFloor, Math.min(1, intensity))
   if (clamped >= 1) return [durationMs]
-  const cycleMs = 20
+  const cycleMs = opts.cycleMs
   const onMs = Math.max(1, Math.round(cycleMs * clamped))
   const offMs = cycleMs - onMs
   if (offMs === 0) return [durationMs]
