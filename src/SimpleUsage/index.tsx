@@ -5,7 +5,7 @@ import './SimpleUsage.css'
 const engine = new HapticEngine()
 
 export function SimpleUsage() {
-  const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2022/03/24/audio_51594bdccc.mp3')
+  const [url, setUrl] = useState('/TRIMMED Chippin In.mp3')
   const [ready, setReady] = useState(false)
   const audioRef = useRef<HTMLAudioElement>(null)
 
