@@ -143,6 +143,7 @@ export class HapticEngine {
         this._onTick?.(currentTime)
 
         const muteWindowMs = (this._outputLatency + this._baseLatency) * 1000
+        // alert(`muteWindowMs: ${muteWindowMs}`)
         const inMuteWindow = performance.now() - this._lastInterruption < muteWindowMs
 
         if (this._trends.length > 0 && !inMuteWindow && !this._audioEl.paused) {
