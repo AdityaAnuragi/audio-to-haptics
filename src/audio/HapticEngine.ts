@@ -103,14 +103,6 @@ export class HapticEngine {
     this.detach()
     this._audioEl = mediaEl
     this._onTick = onTick ?? null
-    // Fallback for when attach() is called on an already-playing element (e.g. App.tsx calls
-    // attach() after audio.play()). The 'play' listener below handles the case where attach()
-    // is called before the user presses play (e.g. MediaUsage native controls).
-    this._lastInterruption = performance.now()
-
-    const onPlay = () => {
-      this._lastInterruption = performance.now()
-    }
 
     const onPause = () => {
       navigator.vibrate(0)
@@ -126,24 +118,33 @@ export class HapticEngine {
       this._lastInterruption = performance.now()
     }
 
-    mediaEl.addEventListener('play', onPlay)
     mediaEl.addEventListener('pause', onPause)
     mediaEl.addEventListener('seeked', onSeeked)
 
     this._cleanup = () => {
-      mediaEl.removeEventListener('play', onPlay)
       mediaEl.removeEventListener('pause', onPause)
       mediaEl.removeEventListener('seeked', onSeeked)
     }
 
     const bucketSize = this._opts.bucketSize
+    let wasPaused = true
     const tick = () => {
       if (this._audioEl) {
         const currentTime = this._audioEl.currentTime
         this._onTick?.(currentTime)
 
+        const isPlaying = !this._audioEl.paused
+        if (isPlaying && wasPaused) {
+          // Detect paused→playing transition inside the RAF loop rather than from a DOM
+          // event. DOM events (play/playing) may fire before the audio hardware pipeline
+          // is ready on some devices, causing the mute window to start too early.
+          // Measuring from here ensures the mute window is anchored to the same frame
+          // that begins executing haptic logic.
+          this._lastInterruption = performance.now()
+        }
+        wasPaused = !isPlaying
+
         const muteWindowMs = (this._outputLatency + this._baseLatency) * 1000
-        // alert(`muteWindowMs: ${muteWindowMs}`)
         const inMuteWindow = performance.now() - this._lastInterruption < muteWindowMs
 
         if (this._trends.length > 0 && !inMuteWindow && !this._audioEl.paused) {

@@ -5,7 +5,7 @@ import './SimpleUsage.css'
 const engine = new HapticEngine()
 
 export function SimpleUsage() {
-  const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2022/11/05/audio_997c8fe344.mp3')
+  const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2022/03/24/audio_51594bdccc.mp3')
   const [ready, setReady] = useState(false)
   const audioRef = useRef<HTMLAudioElement>(null)
 
@@ -30,7 +30,7 @@ export function SimpleUsage() {
         style={{ width: '400px' }}
       />
       <br /><br />
-      <button onClick={analyze}>Analyze</button>
+      <button onClick={analyze}>{ready ? 'Re-analyze' : 'Analyze'}</button>
       <br /><br />
       <audio ref={audioRef} src={url} controls />
     </div>
