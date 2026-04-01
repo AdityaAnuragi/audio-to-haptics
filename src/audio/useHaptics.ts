@@ -1,10 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { HapticEngine } from './HapticEngine'
 import type { HapticOptions } from './analyzeAudio'
 
-export function useHaptics<T extends HTMLMediaElement = HTMLMediaElement>(opts?: Partial<HapticOptions>) {
+export function useHaptics(mediaRef: RefObject<HTMLMediaElement | null>, opts?: Partial<HapticOptions>) {
   const engineRef = useRef(new HapticEngine(opts ?? {}))
-  const mediaRef = useRef<T>(null)
   const [ready, setReady] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -17,7 +16,7 @@ export function useHaptics<T extends HTMLMediaElement = HTMLMediaElement>(opts?:
       engine.attach(mediaRef.current, (t) => setPlaybackTime(t))
     }
     return () => engine.detach()
-  }, [ready])
+  }, [ready, mediaRef])
 
   async function analyze(url: string) {
     setLoading(true)
@@ -51,7 +50,6 @@ export function useHaptics<T extends HTMLMediaElement = HTMLMediaElement>(opts?:
   }
 
   return {
-    mediaRef,
     analyze,
     analyzeBuffer,
     ready,

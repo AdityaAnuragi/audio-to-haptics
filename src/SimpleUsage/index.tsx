@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useHaptics } from '../audio/useHaptics'
 import './SimpleUsage.css'
 
 export function SimpleUsage() {
-  const [url, setUrl] = useState('/TRIMMED Chippin In.mp3')
-  const { mediaRef, analyze, ready } = useHaptics()
+  const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2022/11/05/audio_997c8fe344.mp3')
+  const audioRef = useRef<HTMLAudioElement>(null)
+  const { analyze, ready } = useHaptics(audioRef)
 
   return (
     <div>
@@ -17,7 +18,7 @@ export function SimpleUsage() {
       <br /><br />
       <button onClick={() => analyze(url)}>{ready ? 'Re-analyze' : 'Analyze'}</button>
       <br /><br />
-      <audio ref={mediaRef} src={url} controls />
+      <audio ref={audioRef} src={url} controls />
     </div>
   )
 }
