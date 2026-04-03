@@ -31,7 +31,7 @@ export const DEFAULT_OPTIONS: HapticOptions = {
   sustainLowerBound: 0.75,
   sustainUpperBound: 1.01,
   shortChainBuckets: 4,
-  intensityFloor: 0.5,
+  intensityFloor: 0.55,
   cycleMs: 20,
 }
 

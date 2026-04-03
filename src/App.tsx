@@ -16,6 +16,10 @@ const TEST_AUDIOS = [
   {url: 'https://cdn.pixabay.com/audio/2022/03/10/audio_7f90c5e4fc.mp3', label: 'Metal clashing' },
   // public folder
   {url: '/TRIMMED Chippin In.mp3', label: 'TRIMMED Chippin In.mp3' },
+  {url: '/video/heart_beat.mp4', label: 'heart beat (local mp4, lossy)' },
+  {url: '/video/beep_beep.mp4', label: 'beep_beep.mp4 (local mp4, lossy)' },
+  {url: '/video/chippinIn_from_mp3.mp4', label: 'TRIMMED chippin in VIDEO (local mp4, lossy)' },
+  {url: '/video/chippinIn_flac.mkv', label: 'TRIMMED chippin in VIDEO (local mkv, lossless)' },
   {url: '/Chop Suey.mp3', label: 'Chop Suey.mp3' },
   {url: '/Death Metal Drumming.mp3', label: 'Death Metal (this is really good)' },
   {url: '/Death Metal Drumming pt.2.mp3', label: 'Death Metal Drumming pt.2.mp3' },
