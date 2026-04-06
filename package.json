@@ -25,7 +25,7 @@
   "scripts": {
     "dev": "vite --host",
     "build": "tsc -b && vite build",
-    "build:lib": "vite build && tsc -p tsconfig.lib.json",
+    "build:lib": "vite build --config vite.lib.config.ts && tsc -p tsconfig.lib.json",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run"

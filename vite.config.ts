@@ -10,19 +10,4 @@ export default defineConfig({
       },
     }),
   ],
-  publicDir: false,
-  build: {
-    outDir: 'lib',
-    emptyOutDir: true,
-    lib: {
-      entry: {
-        index: 'src/index.ts',
-        react: 'src/react.ts',
-      },
-      formats: ['es'],
-    },
-    rollupOptions: {
-      external: ['react', 'react-dom', 'react/jsx-runtime'],
-    },
-  },
 })
