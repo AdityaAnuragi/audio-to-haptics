@@ -13,6 +13,20 @@ import {
   DEFAULT_OPTIONS,
 } from './analyzeAudio'
 
+/**
+ * Core class for audio-to-haptics conversion. Works in vanilla JS and any framework.
+ * For React projects, use the `useHaptics` hook instead — it manages the lifecycle automatically.
+ * When using this class directly, you are responsible for calling `detach()` yourself.
+ *
+ * @example
+ * ```ts
+ * const engine = new HapticEngine()
+ * await engine.analyze('https://example.com/audio.mp3')
+ * engine.attach(audioElement)
+ * // later:
+ * engine.detach()
+ * ```
+ */
 export class HapticEngine {
   private _opts: HapticOptions
   private _channelData: Float32Array | null = null
@@ -37,40 +51,114 @@ export class HapticEngine {
   private _onTick: ((time: number) => void) | null = null
   private _cleanup: (() => void) | null = null
 
+  /**
+   * @param opts - Optional algorithm knobs to configure. Any fields you omit fall back to `DEFAULT_OPTIONS`.
+   */
   constructor(opts: Partial<HapticOptions> = {}) {
     this._opts = {...DEFAULT_OPTIONS, ...opts}
   }
 
+  /** Raw amplitude samples from the first audio channel. `null` before analysis. Returns a copy. */
   get channelData(): Float32Array | null { return this._channelData ? new Float32Array(this._channelData) : null }
+
+  /** Samples per second of the analyzed audio (typically 44100 or 48000). */
   get sampleRate(): number { return this._sampleRate }
+
+  /** Total length of the analyzed audio in seconds. */
   get duration(): number { return this._duration }
+
+  /** Number of channels in the original audio (e.g. 1 = mono, 2 = stereo). */
   get numberOfChannels(): number { return this._numberOfChannels }
+
+  /** Audio hardware pipeline delay in seconds. Used internally for the mute window calculation. */
   get outputLatency(): number { return this._outputLatency }
+
+  /** Browser-side audio processing delay in seconds. Used internally for the mute window calculation. */
   get baseLatency(): number { return this._baseLatency }
+
+  /** Per-bucket amplitude data from the analysis. One entry per ~60ms of audio. Returns a copy. */
   get trends(): Trend[] { return structuredClone(this._trends) }
+
+  /**
+   * Boolean array, one entry per bucket. `true` means the device should vibrate during that bucket.
+   * Returns a copy.
+   */
   get vibrationMap(): boolean[] { return [...this._vibrationMap] }
+
+  /** Computed noise floor amplitude. Buckets below this are never vibrated. */
   get noiseFloor(): number { return this._noiseFloor }
+
+  /**
+   * Per-bucket end time of the vibration chain that bucket belongs to, in seconds.
+   * Used by the RAF loop to calculate how long to fire the vibration pattern.
+   * Returns a copy.
+   */
   get chainEndTime(): number[] { return [...this._chainEndTime] }
+
+  /**
+   * Per-bucket average intensity (0–1) of the vibration chain that bucket belongs to.
+   * Used by the RAF loop to calculate PWM duty cycle.
+   * Returns a copy.
+   */
   get chainIntensity(): number[] { return [...this._chainIntensity] }
+
+  /**
+   * Per-bucket length (in buckets) of the vibration chain that bucket belongs to.
+   * Chains shorter than `opts.shortChainBuckets` fire as a solid MAX pulse instead of PWM.
+   * Returns a copy.
+   */
   get chainLength(): number[] { return [...this._chainLength] }
+
+  /** Copy of the current algorithm options. Reflects what was passed to the constructor merged with `DEFAULT_OPTIONS`. */
   get opts(): HapticOptions { return {...this._opts} }
+
+  /** Whether haptics are suppressed. When `true`, `navigator.vibrate()` is never called, but the RAF loop keeps running. */
   get muted(): boolean { return this._muted }
+
+  /** Suppress or restore haptics. The RAF loop keeps running either way. */
   set muted(value: boolean) { this._muted = value }
+
+  /** Flips the muted state. */
   toggleMuted(): void { this._muted = !this._muted }
+
+  /**
+   * The full vibration pattern as a `navigator.vibrate()` array — alternating vibrate/pause durations in ms.
+   * Used for fire-and-forget playback. The RAF loop uses chain data instead for precise sync.
+   * Returns a copy.
+   */
   get pattern(): number[] { return [...this._pattern] }
 
+  /**
+   * Fetches an audio file from a URL and runs the full analysis pipeline.
+   * Call this before `attach()`. For raw bytes, use `analyzeBuffer` instead.
+   *
+   * @param url - URL of the audio file to fetch and analyze (MP3, WAV, FLAC, etc.)
+   */
   async analyze(url: string): Promise<void> {
     const result = await analyzeAudio(url)
     this._storeResult(result)
   }
 
-  /** Convenience: analyze + attach in one call. Set audioEl.src yourself before calling play(). */
+  /**
+   * Convenience: runs `analyze` + `attach` in one call.
+   * Set `mediaEl.src` yourself before calling `play()` — e.g. `<audio src="...">` or `<video src="...">`.
+   *
+   * @param url - URL of the audio file to analyze
+   * @param mediaEl - The `<audio>` or `<video>` element to attach to
+   * @param onTick - Optional callback fired every animation frame with the current playback time in seconds
+   */
   async load(url: string, mediaEl: HTMLMediaElement, onTick?: (time: number) => void): Promise<void> {
     await this.analyze(url)
     this.attach(mediaEl, onTick)
   }
 
-  /** For when the user already has raw audio bytes (file input, drag-and-drop, WebSocket, etc.) */
+  /**
+   * Runs the full analysis pipeline from raw audio bytes.
+   * Use this when you already have the file as an `ArrayBuffer` — e.g. from a file input or drag-and-drop.
+   * For a URL, use `analyze` instead.
+   *
+   * @param arrayBuffer - Raw audio file bytes (MP3, WAV, FLAC, etc.)
+   */
   async analyzeBuffer(arrayBuffer: ArrayBuffer): Promise<void> {
     const result = await decodeAudioBuffer(arrayBuffer)
     this._storeResult(result)
@@ -99,6 +187,14 @@ export class HapticEngine {
     console.log(`[noise floor] peak=${peak}, noiseFloor=${this._noiseFloor.toFixed(4)}, buckets: ${total} total, ${silent} silent, ${belowFloor} below floor (${(belowFloor/total*100).toFixed(1)}% filtered), ${total - silent - belowFloor} above floor`)
   }
 
+  /**
+   * Starts the RAF loop that drives haptics in sync with the media element.
+   * Call this after `analyze()` or `analyzeBuffer()` completes.
+   * Automatically handles pause, seek, and mute window suppression.
+   *
+   * @param mediaEl - The `<audio>` or `<video>` element to sync haptics with
+   * @param onTick - Optional callback fired every animation frame with the current playback time in seconds
+   */
   attach(mediaEl: HTMLMediaElement, onTick?: (time: number) => void): void {
     this.detach()
     this._audioEl = mediaEl
@@ -173,6 +269,10 @@ export class HapticEngine {
     this._rafId = requestAnimationFrame(tick)
   }
 
+  /**
+   * Stops the RAF loop, cancels any active vibration, and removes all event listeners.
+   * Safe to call even if `attach()` was never called.
+   */
   detach(): void {
     cancelAnimationFrame(this._rafId)
     this._rafId = 0

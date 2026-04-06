@@ -2,6 +2,24 @@ import { useEffect, useRef, useState, type RefObject } from 'react'
 import { HapticEngine } from './HapticEngine'
 import type { HapticOptions } from './analyzeAudio'
 
+/**
+ * React hook for audio-to-haptics. Wraps `HapticEngine` and manages its lifecycle automatically —
+ * including calling `detach()` when the component unmounts. For manual lifecycle control, use `HapticEngine` directly instead.
+ *
+ * @param mediaRef - A ref attached to your `<audio>` or `<video>` element
+ * @param opts - Optional algorithm knobs to configure. Any fields you omit fall back to `DEFAULT_OPTIONS`.
+ *
+ * @returns
+ * - `analyze(url)` — fetch + analyze an audio URL. Sets `loading` while in flight, `ready` when done.
+ * - `analyzeBuffer(arrayBuffer)` — same as `analyze` but for raw bytes (file input, drag-and-drop). Use `analyze` for a URL instead.
+ * - `ready` — `true` once analysis completes. Safe to read `engine` data after this point.
+ * - `loading` — `true` while analysis is in flight.
+ * - `error` — error message string if analysis threw, `null` otherwise.
+ * - `playbackTime` — current playback position in seconds, updated every animation frame while playing.
+ * - `muted` — whether haptics are suppressed. Triggers a re-render when toggled.
+ * - `toggleMuted()` — flips the muted state and updates React state.
+ * - `engine` — direct access to the underlying `HapticEngine` instance. Read analysis data (trends, vibrationMap, etc.) here after `ready` is `true`.
+ */
 export function useHaptics(mediaRef: RefObject<HTMLMediaElement | null>, opts?: Partial<HapticOptions>) {
   const engineRef = useRef(new HapticEngine(opts ?? {}))
   const [ready, setReady] = useState(false)

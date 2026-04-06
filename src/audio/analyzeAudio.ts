@@ -1,27 +1,98 @@
+/**
+ * Amplitude data for a single time bucket of audio.
+ * Think of it like a snapshot every ~60ms: "between 1.2s and 1.26s, the loudest the audio got was 0.8".
+ * The full analysis is an array of these, one per bucket.
+ */
 export interface Trend {
+  /** Sample index where this bucket starts */
   startIndex: number
+
+  /** Sample index where this bucket ends (inclusive) */
   endIndex: number
+
+  /** Start time of this bucket in seconds */
   startTime: number
+
+  /** End time of this bucket in seconds */
   endTime: number
+
+  /** Minimum absolute amplitude in this bucket (rarely used) */
   min: number
+
+  /** Peak absolute amplitude in this bucket — primary value used for vibration decisions */
   max: number
+
+  /** RMS amplitude of the first half of the bucket */
   leftRms: number
+
+  /** RMS amplitude of the second half of the bucket */
   rightRms: number
 }
 
+/**
+ * Knobs for tuning the vibration algorithm.
+ * All fields have sensible defaults via `DEFAULT_OPTIONS` — you only need to override what you want to change.
+ *
+ * Pass a `Partial<HapticOptions>` to `HapticEngine` (vanilla JS / any framework)
+ * or to `useHaptics` (React projects).
+ */
 export interface HapticOptions {
+  /** Number of audio samples per bucket. Controls timing precision. Default ~60ms at 44100Hz. */
   bucketSize: number
-  vibrateThresholdRatio: number // noise floor as a fraction of peak amplitude
-  vibrateThresholdMin: number   // absolute minimum floor (prevents triggering on digital silence)
-  neighborRadius: number        // look at N buckets in the past (~240ms at 60ms/bucket)
-  spikeRatio: number            // must be this much louder than past neighbor average
-  sustainLowerBound: number     // minimum ratio of current to previous max to sustain vibration through decay
-  sustainUpperBound: number     // maximum ratio of current to previous max to sustain (blocks rising sections)
-  shortChainBuckets: number     // chains shorter than this many buckets fire as a solid pulse (no PWM)
-  intensityFloor: number        // minimum intensity passed to PWM (0–1), clamps low-intensity chains upward
-  cycleMs: number               // PWM cycle period in ms — each on/off pair sums to this value
+
+  /** Noise floor as a fraction of peak amplitude. Buckets below this are never vibrated. Default: 0.4 */
+  vibrateThresholdRatio: number
+
+  /** Absolute minimum noise floor regardless of peak. Prevents triggering on near-digital-silence. Default: 0.04 */
+  vibrateThresholdMin: number
+
+  /** How many past buckets to compare against when detecting a spike. Default: 4 (~240ms) */
+  neighborRadius: number
+
+  /**
+   * How much louder than the past average a bucket must be to trigger vibration.
+   * Lower = more vibration, higher = only strong spikes. Default: 1.5
+   */
+  spikeRatio: number
+
+  /**
+   * Minimum ratio of current `trend.max` to the previous bucket's `trend.max` to sustain vibration through a decay tail.
+   * e.g. 0.75 means "keep vibrating as long as the current bucket hasn't dropped below 75% of the previous bucket's peak".
+   * Default: 0.75
+   */
+  sustainLowerBound: number
+
+  /**
+   * Maximum ratio of current `trend.max` to the previous bucket's `trend.max` to count as sustain.
+   * Anything above this is treated as a new rising section, not a decay tail — so it won't be sustained through.
+   * Default: 1.01
+   */
+  sustainUpperBound: number
+
+  /**
+   * Chains with a length strictly less than this value fire as a solid MAX pulse instead of PWM.
+   * e.g. with the default of 4: chains of length 1, 2, or 3 → solid pulse; length 4 or longer → PWM.
+   * Short sounds (kicks, snaps) feel more impactful as a solid pulse. Default: 4
+   */
+  shortChainBuckets: number
+
+  /**
+   * Minimum intensity (0–1) for sections where haptics are active.
+   * Clamps quieter-but-haptic sections upward so the motor doesn't receive a duty cycle too low to spin.
+   * e.g. 0.55 means even the quietest vibrating section gets at least 55% duty cycle. Default: 0.55
+   */
+  intensityFloor: number
+
+  /**
+   * PWM cycle period in ms. Each on+off pair sums to this value.
+   * At 20ms with 50% intensity: `[10, 10, 10, 10, ...]` (10ms on, 10ms off, repeating).
+   * At 10ms with 50% intensity: `[5, 5, 5, 5, ...]` (5ms on, 5ms off, repeating).
+   * Motor inertia smooths these rapid cycles into perceived partial amplitude. Default: 20
+   */
+  cycleMs: number
 }
 
+/** Sensible defaults for all algorithm knobs. Pass `Partial<HapticOptions>` to override only what you need. */
 export const DEFAULT_OPTIONS: HapticOptions = {
   bucketSize: 4410 * 0.6,
   vibrateThresholdRatio: 0.4,
@@ -232,12 +303,33 @@ export function classifyLoudness(max: number): { label: string; color: string } 
   return {label: 'very loud', color: '#f66'}
 }
 
+/**
+ * Raw output from decoding an audio file — returned by `analyzeAudio` and `decodeAudioBuffer`.
+ * You won't usually need to work with this directly; it's consumed internally by `HapticEngine`.
+ */
 export interface AnalysisResult {
+  /** Raw amplitude samples from the first audio channel, one float per sample */
   channelData: Float32Array
+
+  /** Samples per second (typically 44100 or 48000) */
   sampleRate: number
+
+  /** Total length of the audio in seconds */
   duration: number
+
+  /** Number of channels in the original audio (e.g. 1 = mono, 2 = stereo) */
   numberOfChannels: number
+
+  /**
+   * Audio hardware pipeline delay in seconds, reported by the browser's AudioContext.
+   * Used to calculate the mute window after play/seek so haptics don't fire before sound reaches the speakers.
+   */
   outputLatency: number
+
+  /**
+   * Additional browser-side audio processing delay in seconds.
+   * Combined with `outputLatency` for the full mute window calculation.
+   */
   baseLatency: number
 }
 
@@ -259,6 +351,14 @@ export interface AnalysisResult {
 //   return rendered.getChannelData(0)
 // }
 
+/**
+ * Decodes raw audio bytes into an `AnalysisResult`.
+ * Use this when you already have the file as an `ArrayBuffer` — e.g. from a file input or drag-and-drop.
+ * For a URL, use `analyzeAudio` instead.
+ *
+ * @param arrayBuffer - Raw audio file bytes (MP3, WAV, FLAC, etc.)
+ * @returns Decoded audio data including channel samples, sample rate, duration, and latency values
+ */
 export async function decodeAudioBuffer(arrayBuffer: ArrayBuffer): Promise<AnalysisResult> {
   const audioContext = new AudioContext()
   const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
@@ -281,6 +381,14 @@ export async function decodeAudioBuffer(arrayBuffer: ArrayBuffer): Promise<Analy
   }
 }
 
+/**
+ * Fetches an audio file from a URL and decodes it into an `AnalysisResult`.
+ * For raw bytes (file input, drag-and-drop), use `decodeAudioBuffer` instead.
+ *
+ * @param url - URL of the audio file to fetch and decode (MP3, WAV, FLAC, etc.)
+ * @returns Decoded audio data including channel samples, sample rate, duration, and latency values
+ * @throws If the fetch fails (non-2xx response) or the audio can't be decoded
+ */
 export async function analyzeAudio(url: string): Promise<AnalysisResult> {
   const response = await fetch(url)
   if (!response.ok) {
