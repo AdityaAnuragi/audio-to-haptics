@@ -1,11 +1,31 @@
 {
   "name": "audio-to-haptics",
-  "private": true,
-  "version": "0.0.0",
+  "private": false,
+  "version": "0.0.1",
   "type": "module",
+  "exports": {
+    ".": {
+      "import": "./lib/index.js",
+      "types": "./lib/index.d.ts"
+    },
+    "./react": {
+      "import": "./lib/react.js",
+      "types": "./lib/react.d.ts"
+    }
+  },
+  "files": ["lib"],
+  "peerDependencies": {
+    "react": ">=19"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
   "scripts": {
     "dev": "vite --host",
     "build": "tsc -b && vite build",
+    "build:lib": "vite build && tsc -p tsconfig.lib.json",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run"
