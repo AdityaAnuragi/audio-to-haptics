@@ -426,7 +426,7 @@ The hook calls `detach()` automatically when the component unmounts. `HapticEngi
 
 **Page structure (top to bottom)**:
 
-1. **Hero** — brief intro: "Convert audio into haptic feedback for mobile devices." One line explaining it syncs vibration with whatever's playing. CTA to scroll down.
+1. **Hero** — brief intro: "Convert audio into haptic feedback for mobile devices." One line explaining it syncs vibration with whatever's playing. CTA to scroll down. Includes a visual of a waveform SVG icon → arrow → vibrating phone SVG icon to communicate the concept instantly. Use Lucide or Heroicons for the icons (both free, clean aesthetic).
 
 2. **Desktop warning banner** — persistent, visible. Something like: "Vibration only works on Android Chrome — on desktop you can still try the demo, you just won't feel anything."
 
