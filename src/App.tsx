@@ -153,7 +153,7 @@ function App() {
     <div>
       <h1>Audio to Haptics</h1>
 
-      <div style={{display: 'flex', gap: '8px', marginBottom: '8px'}}>
+      <div style={{marginBottom: '8px'}}>
         <select
           value={TEST_AUDIOS.some(a => a.url === url) ? url : '__custom__'}
           onChange={(e) => {
@@ -168,14 +168,11 @@ function App() {
             if (playing) stop()
             else setPlaybackTime(0)
           }}
-          style={{flex: 1, padding: '8px', fontSize: '14px'}}
+          style={{width: '100%', padding: '8px', fontSize: '14px'}}
         >
           {TEST_AUDIOS.map((a) => <option key={a.url} value={a.url}>{a.label}</option>)}
           <option value="__custom__">Custom URL...</option>
         </select>
-        <button onClick={handleAnalyze} disabled={loading || !url}>
-          {loading ? 'Analyzing...' : 'Analyze'}
-        </button>
       </div>
       {!TEST_AUDIOS.some(a => a.url === url) && <div style={{display: 'flex', gap: '8px', marginBottom: '16px'}}>
         <input
@@ -188,6 +185,9 @@ function App() {
       </div>}
 
       <div style={{display: 'flex', gap: '8px', marginBottom: '16px'}}>
+        <button onClick={handleAnalyze} disabled={loading || !url}>
+          {loading ? 'Analyzing...' : 'Analyze'}
+        </button>
         <button
           onClick={() => {
             if (playing) {
