@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react'
-import { useHaptics } from '../audio/useHaptics'
+import { useHaptics } from '../react'
 import './SimpleUsage.css'
 
 export function SimpleUsage() {
-  const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2022/11/05/audio_997c8fe344.mp3')
+  const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2022/03/24/audio_51594bdccc.mp3')
   const audioRef = useRef<HTMLAudioElement>(null)
   const { analyze, ready } = useHaptics(audioRef)
 
