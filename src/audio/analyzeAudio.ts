@@ -296,12 +296,12 @@ export function computeChainData(trends: Trend[], vibrationMap: boolean[], opts:
   return { chainEndTime, chainIntensity, chainLength }
 }
 
-export function classifyLoudness(max: number): { label: string; color: string } {
-  if (max === 0) return {label: 'silence', color: '#666'}
-  if (max < 0.3) return {label: 'quiet', color: '#6b9'}
-  if (max < 0.7) return {label: 'loud', color: '#db6'}
-  return {label: 'very loud', color: '#f66'}
-}
+// export function classifyLoudness(max: number): { label: string; color: string } {
+//   if (max === 0) return {label: 'silence', color: '#666'}
+//   if (max < 0.3) return {label: 'quiet', color: '#6b9'}
+//   if (max < 0.7) return {label: 'loud', color: '#db6'}
+//   return {label: 'very loud', color: '#f66'}
+// }
 
 /**
  * Raw output from decoding an audio file — returned by `analyzeAudio` and `decodeAudioBuffer`.
