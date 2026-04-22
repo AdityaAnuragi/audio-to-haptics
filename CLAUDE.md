@@ -381,11 +381,20 @@ At launch swap for `"^0.0.1"` once published to npm.
 import { HapticEngine } from 'audio-to-haptics'
 const engine = new HapticEngine()
 await engine.analyze(url)         // fetch + decode + run analysis pipeline
-engine.attach(mediaEl)            // start RAF loop syncing haptics to media element
+engine.attach(mediaEl, (time, intensity, isShortBurst) => {
+  // called every RAF frame while playing
+  // time: current playback position in seconds
+  // intensity: 0–1, how loud/strong the audio is right now. 0 = silent, 1 = peak
+  // isShortBurst: true = sharp transient hit (kick, gunshot, heartbeat), false = sustained section or silence
+  updateVisualizer(intensity, isShortBurst)
+})
 engine.detach()                   // stop everything, cancel vibration
 engine.muted = true               // suppress vibration without stopping RAF
 engine.toggleMuted()              // flip muted state
 engine.opts                       // read current HapticOptions
+engine.sampleRate                 // samples/sec of analyzed audio (typically 44100 or 48000)
+engine.playbackIntensity          // same as onTick intensity — readable between frames
+engine.playbackIsShortBurst       // same as onTick isShortBurst — readable between frames
 ```
 
 **React — import from `'audio-to-haptics/react'`**
@@ -412,10 +421,46 @@ const { muted, toggleMuted } = useHaptics(audioRef)
 // playback time (updates every RAF frame while playing)
 const { playbackTime } = useHaptics(audioRef)
 
+// visual sync — both update every RAF frame, trigger re-renders automatically
+const { playbackIntensity, playbackIsShortBurst } = useHaptics(audioRef)
+// playbackIntensity: 0–1. 0 = silent or paused, 1 = loudest peak in the audio
+// playbackIsShortBurst: true = sharp transient hit (kick drum, gunshot, heartbeat)
+//                       false = sustained section (bass hold, long note) or silence
+
 // custom algorithm options
 const { analyze } = useHaptics(audioRef, { spikeRatio: 2.0 })
 ```
 The hook calls `detach()` automatically when the component unmounts. `HapticEngine` does not — if using the class directly, call `detach()` yourself.
+
+### Haptic Visualizer (Trap Nation-style blob)
+
+The library exposes `playbackIntensity` and `playbackIsShortBurst` specifically to drive audio-reactive visuals. These are the only two values you need. Use whatever rendering approach suits the design — SVG, canvas, WebGL, CSS — the library doesn't care.
+
+**The two states:**
+- `isShortBurst=true` → sharp transient hit (kick, gunshot, heartbeat). Animate aggressively: spike the geometry, flash bright, snap back fast. Intensity drives how strong the spike is.
+- `isShortBurst=false` → sustained section or silence. `intensity` tells you how loud: 0 = silent/paused (return to rest), >0 = animate gently with organic breathing/undulation.
+
+**How the data flows in React:**
+
+Both values are React state and update every RAF frame, so the component re-renders automatically while playing — no separate animation loop needed. `playbackTime` is also available and useful as a continuous phase driver to keep sustained animations moving even when intensity is constant.
+
+```tsx
+const { playbackIntensity, playbackIsShortBurst, playbackTime } = useHaptics(videoRef)
+// plug these directly into whatever visual you're building
+```
+
+**One approach we explored (SVG blob) — treat this as an idea, not a template:**
+
+Generate polar coordinates around a circle, push points outward by `intensity`, run through a smooth bezier path. For bursts: few large bumps (4–6), high amplitude, snaps immediately since path recomputes each frame. For sustained: many small points modulated by overlapping sine waves, with `playbackTime` as the phase so the shape slowly rotates even during a held note.
+
+A `smoothPath` utility that produces a smooth closed curve through N points using quadratic bezier midpoints works well for this — each point becomes a control point, midpoints become curve endpoints, result is always smooth regardless of point distribution.
+
+This approach was prototyped and confirmed the primitives work. The visual result was mediocre — the right data was there, the implementation just wasn't polished. Canvas or WebGL would likely produce a better result. Pick the right tool for the design.
+
+**What makes the animation feel alive:**
+- `playbackTime` as phase driver — without it, sustained sections are static blobs. Rotating the phase at ~0.6 rad/s gives slow organic movement.
+- Differentiating burst vs sustained visually — if both look the same, the visualizer feels flat.
+- Snapping immediately on burst (no easing/transition) — transient hits are short, easing makes them feel late.
 
 ### Landing Page Design
 
@@ -441,12 +486,19 @@ Each video example is its own isolated React component. No shared state between 
 ```tsx
 function VideoExample({ src, credit }: { src: string; credit: string }) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const { analyze } = useHaptics(videoRef)
+  const { analyze, playbackIntensity, playbackIsShortBurst, playbackTime } = useHaptics(videoRef)
 
   useEffect(() => { void analyze(src) }, [])
 
+  // Drive the blob visualizer with playbackIntensity + playbackIsShortBurst
+  // See "Haptic Visualizer" section below for blob path generation details
+  const blobPath = buildBlobPath(playbackIntensity, playbackIsShortBurst, playbackTime)
+
   return (
     <div>
+      <svg viewBox="-20 -20 240 240" width="200" height="200">
+        <path d={blobPath} fill="..." />
+      </svg>
       <video ref={videoRef} src={src} controls />
       <small>{credit}</small>
     </div>
