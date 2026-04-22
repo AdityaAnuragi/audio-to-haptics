@@ -17,6 +17,9 @@ const TEST_AUDIOS = [
   // public folder
   {url: '/TRIMMED Chippin In.mp3', label: 'TRIMMED Chippin In.mp3' },
   {url: '/video/heart_beat.mp4', label: 'heart beat (local mp4, lossy)' },
+  {url: '/video/Heartbeat.mp4', label: 'heart beat (landing page)' },
+  {url: '/video/HeartBeat2.mp4', label: 'heart beat (landing page - blank screen)' },
+  {url: '/video/AWP.mp4', label: 'AWP' },
   {url: '/video/beep_beep.mp4', label: 'beep_beep.mp4 (local mp4, lossy)' },
   {url: '/video/chippinIn_from_mp3.mp4', label: 'TRIMMED chippin in VIDEO (local mp4, lossy)' },
   {url: '/video/chippinIn_flac.mkv', label: 'TRIMMED chippin in VIDEO (local mkv, lossless)' },
@@ -74,7 +77,7 @@ interface Analysis {
 }
 
 function App() {
-  const [url, setUrl] = useState('https://cdn.pixabay.com/audio/2022/03/24/audio_51594bdccc.mp3')
+  const [url, setUrl] = useState('/video/AWP.mp4')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [analysis, setAnalysis] = useState<Analysis | null>(null)
@@ -83,7 +86,7 @@ function App() {
   const [vibrateMode, setVibrateMode] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   // const rafRef = useRef<number>(0)
-  const engineRef = useRef(new HapticEngine())
+  const engineRef = useRef(new HapticEngine( { sustainLowerBound: 0.5, sustainUpperBound: 1.5 } ))
 
   const trends = analysis?.trends ?? []
   const vibrationMap = analysis?.vibrationMap ?? []
