@@ -381,20 +381,22 @@ At launch swap for `"^0.0.1"` once published to npm.
 import { HapticEngine } from 'audio-to-haptics'
 const engine = new HapticEngine()
 await engine.analyze(url)         // fetch + decode + run analysis pipeline
-engine.attach(mediaEl, (time, intensity, isShortBurst) => {
+engine.attach(mediaEl, (time, chainIntensity, bucketIntensity, chainIsShortBurst) => {
   // called every RAF frame while playing
   // time: current playback position in seconds
-  // intensity: 0–1, how loud/strong the audio is right now. 0 = silent, 1 = peak
-  // isShortBurst: true = sharp transient hit (kick, gunshot, heartbeat), false = sustained section or silence
-  updateVisualizer(intensity, isShortBurst)
+  // chainIntensity: 0–1, chain-average intensity — constant for the whole vibration chain
+  // bucketIntensity: 0–1, per-bucket intensity — varies frame-by-frame as audio decays. Use this for visuals.
+  // chainIsShortBurst: true = short transient chain (kick, gunshot, heartbeat), false = sustained chain or silence
+  updateVisualizer(bucketIntensity, chainIsShortBurst)
 })
 engine.detach()                   // stop everything, cancel vibration
 engine.muted = true               // suppress vibration without stopping RAF
 engine.toggleMuted()              // flip muted state
 engine.opts                       // read current HapticOptions
 engine.sampleRate                 // samples/sec of analyzed audio (typically 44100 or 48000)
-engine.playbackIntensity          // same as onTick intensity — readable between frames
-engine.playbackIsShortBurst       // same as onTick isShortBurst — readable between frames
+engine.playbackChainIntensity     // same as onTick chainIntensity — readable between frames
+engine.playbackBucketIntensity    // same as onTick bucketIntensity — readable between frames
+engine.playbackChainIsShortBurst  // same as onTick chainIsShortBurst — readable between frames
 ```
 
 **React — import from `'audio-to-haptics/react'`**
@@ -421,11 +423,12 @@ const { muted, toggleMuted } = useHaptics(audioRef)
 // playback time (updates every RAF frame while playing)
 const { playbackTime } = useHaptics(audioRef)
 
-// visual sync — both update every RAF frame, trigger re-renders automatically
-const { playbackIntensity, playbackIsShortBurst } = useHaptics(audioRef)
-// playbackIntensity: 0–1. 0 = silent or paused, 1 = loudest peak in the audio
-// playbackIsShortBurst: true = sharp transient hit (kick drum, gunshot, heartbeat)
-//                       false = sustained section (bass hold, long note) or silence
+// visual sync — all three update every RAF frame, trigger re-renders automatically
+const { playbackBucketIntensity, playbackChainIntensity, playbackChainIsShortBurst } = useHaptics(audioRef)
+// playbackBucketIntensity: 0–1, per-bucket — varies frame-by-frame as audio decays. Use this for visuals.
+// playbackChainIntensity: 0–1, chain-average — constant across the whole chain. Used internally for PWM.
+// playbackChainIsShortBurst: true = short transient chain (kick drum, gunshot, heartbeat)
+//                            false = sustained chain (bass hold, long note) or silence
 
 // custom algorithm options
 const { analyze } = useHaptics(audioRef, { spikeRatio: 2.0 })
@@ -434,18 +437,18 @@ The hook calls `detach()` automatically when the component unmounts. `HapticEngi
 
 ### Haptic Visualizer (Trap Nation-style blob)
 
-The library exposes `playbackIntensity` and `playbackIsShortBurst` specifically to drive audio-reactive visuals. These are the only two values you need. Use whatever rendering approach suits the design — SVG, canvas, WebGL, CSS — the library doesn't care.
+The library exposes `playbackBucketIntensity` and `playbackChainIsShortBurst` specifically to drive audio-reactive visuals. These are the two values you need for visuals. Use whatever rendering approach suits the design — SVG, canvas, WebGL, CSS — the library doesn't care.
 
 **The two states:**
-- `isShortBurst=true` → sharp transient hit (kick, gunshot, heartbeat). Animate aggressively: spike the geometry, flash bright, snap back fast. Intensity drives how strong the spike is.
-- `isShortBurst=false` → sustained section or silence. `intensity` tells you how loud: 0 = silent/paused (return to rest), >0 = animate gently with organic breathing/undulation.
+- `chainIsShortBurst=true` → short transient chain (kick, gunshot, heartbeat). Animate aggressively: spike the geometry, flash bright, snap back fast. `bucketIntensity` drives how strong the spike is.
+- `chainIsShortBurst=false` → sustained chain or silence. `bucketIntensity` tells you how loud: 0 = silent/paused (return to rest), >0 = animate gently with organic breathing/undulation. Unlike `playbackChainIntensity`, bucket intensity actually varies frame-by-frame as the chain decays, so the blob shrinks naturally.
 
 **How the data flows in React:**
 
-Both values are React state and update every RAF frame, so the component re-renders automatically while playing — no separate animation loop needed. `playbackTime` is also available and useful as a continuous phase driver to keep sustained animations moving even when intensity is constant.
+All three values are React state and update every RAF frame, so the component re-renders automatically while playing — no separate animation loop needed. `playbackTime` is also available and useful as a continuous phase driver to keep sustained animations moving even when intensity is constant.
 
 ```tsx
-const { playbackIntensity, playbackIsShortBurst, playbackTime } = useHaptics(videoRef)
+const { playbackBucketIntensity, playbackChainIsShortBurst, playbackTime } = useHaptics(videoRef)
 // plug these directly into whatever visual you're building
 ```
 
@@ -486,13 +489,13 @@ Each video example is its own isolated React component. No shared state between 
 ```tsx
 function VideoExample({ src, credit }: { src: string; credit: string }) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const { analyze, playbackIntensity, playbackIsShortBurst, playbackTime } = useHaptics(videoRef)
+  const { analyze, playbackBucketIntensity, playbackChainIsShortBurst, playbackTime } = useHaptics(videoRef)
 
   useEffect(() => { void analyze(src) }, [])
 
-  // Drive the blob visualizer with playbackIntensity + playbackIsShortBurst
-  // See "Haptic Visualizer" section below for blob path generation details
-  const blobPath = buildBlobPath(playbackIntensity, playbackIsShortBurst, playbackTime)
+  // Drive the blob visualizer with playbackBucketIntensity + playbackChainIsShortBurst
+  // See "Haptic Visualizer" section above for blob path generation details
+  const blobPath = buildBlobPath(playbackBucketIntensity, playbackChainIsShortBurst, playbackTime)
 
   return (
     <div>
