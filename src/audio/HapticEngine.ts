@@ -6,6 +6,7 @@ import {
   computeNoiseFloor,
   trendsToVibrationPattern,
   computeChainData,
+  computeIntensity,
   intensityToPattern,
   type AnalysisResult,
   type Trend,
@@ -55,9 +56,10 @@ export class HapticEngine {
   private _wasVibrating = false
   private _lastInterruption = 0
   private _playbackChainIntensity: number = 0
+  private _playbackBucketIntensity: number = 0
   private _playbackChainIsShortBurst: boolean = false
   private _audioEl: HTMLMediaElement | null = null
-  private _onTick: ((time: number, chainIntensity: number, chainIsShortBurst: boolean) => void) | null = null
+  private _onTick: ((time: number, chainIntensity: number, bucketIntensity: number, chainIsShortBurst: boolean) => void) | null = null
   private _cleanup: (() => void) | null = null
 
   /**
@@ -130,6 +132,14 @@ export class HapticEngine {
   get playbackChainIntensity(): number { return this._playbackChainIntensity }
 
   /**
+   * Per-bucket intensity (0–1) for the current bucket, updated every animation frame.
+   * Varies within a chain as the audio decays — use this to drive frame-by-frame visuals
+   * like a blob that shrinks as a kick drum echo fades.
+   * 0 outside vibrating chains (same gate as `playbackChainIntensity`).
+   */
+  get playbackBucketIntensity(): number { return this._playbackBucketIntensity }
+
+  /**
    * Whether the current chain is a short transient burst, updated every animation frame.
    * Derived from the chain's bucket count: `true` when `chainLength < opts.shortChainBuckets`.
    * Constant for every bucket in the chain — does not change mid-chain.
@@ -173,7 +183,7 @@ export class HapticEngine {
    * @param mediaEl - The `<audio>` or `<video>` element to attach to
    * @param onTick - Optional callback fired every animation frame. See `attach()` for argument details.
    */
-  async load(url: string, mediaEl: HTMLMediaElement, onTick?: (time: number, chainIntensity: number, chainIsShortBurst: boolean) => void): Promise<void> {
+  async load(url: string, mediaEl: HTMLMediaElement, onTick?: (time: number, chainIntensity: number, bucketIntensity: number, chainIsShortBurst: boolean) => void): Promise<void> {
     await this.analyze(url)
     this.attach(mediaEl, onTick)
   }
@@ -221,10 +231,11 @@ export class HapticEngine {
    * @param mediaEl - The `<audio>` or `<video>` element to sync haptics with
    * @param onTick - Optional callback fired every animation frame while playing.
    *   - `time` — current playback position in seconds
-   *   - `chainIntensity` — chain-average intensity (0–1); 0 outside vibrating chains. Same as `playbackChainIntensity`.
+   *   - `chainIntensity` — chain-average intensity (0–1); constant for the whole chain. Same as `playbackChainIntensity`.
+   *   - `bucketIntensity` — per-bucket intensity (0–1); varies frame-by-frame within a chain. Same as `playbackBucketIntensity`.
    *   - `chainIsShortBurst` — `true` if the chain is shorter than `opts.shortChainBuckets`. Same as `playbackChainIsShortBurst`.
    */
-  attach(mediaEl: HTMLMediaElement, onTick?: (time: number, chainIntensity: number, chainIsShortBurst: boolean) => void): void {
+  attach(mediaEl: HTMLMediaElement, onTick?: (time: number, chainIntensity: number, bucketIntensity: number, chainIsShortBurst: boolean) => void): void {
     this.detach()
     this._audioEl = mediaEl
     this._onTick = onTick ?? null
@@ -277,6 +288,7 @@ export class HapticEngine {
 
           // Visual sync: updated every frame regardless of mute window
           this._playbackChainIntensity = shouldVib ? (this._chainIntensity[bucketIndex] ?? 0) : 0
+          this._playbackBucketIntensity = shouldVib ? computeIntensity(this._trends[bucketIndex].max, this._noiseFloor) : 0
           this._playbackChainIsShortBurst = shouldVib ? this._chainLength[bucketIndex] < this._opts.shortChainBuckets : false
 
           // Haptics: gated by mute window
@@ -299,10 +311,11 @@ export class HapticEngine {
           }
         } else {
           this._playbackChainIntensity = 0
+          this._playbackBucketIntensity = 0
           this._playbackChainIsShortBurst = false
         }
 
-        this._onTick?.(currentTime, this._playbackChainIntensity, this._playbackChainIsShortBurst)
+        this._onTick?.(currentTime, this._playbackChainIntensity, this._playbackBucketIntensity, this._playbackChainIsShortBurst)
       }
       this._rafId = requestAnimationFrame(tick)
     }
