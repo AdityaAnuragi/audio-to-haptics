@@ -16,8 +16,8 @@ import type { HapticOptions } from './analyzeAudio'
  * - `loading` — `true` while analysis is in flight.
  * - `error` — error message string if analysis threw, `null` otherwise.
  * - `playbackTime` — current playback position in seconds, updated every animation frame while playing.
- * - `playbackIntensity` — current audio intensity as a 0–1 value, updated every animation frame. 0 when silent or paused, 1 at peak loudness. Use this to drive visual effects like scaling or brightness.
- * - `playbackIsShortBurst` — `true` when the current moment is a short transient hit (gunshot, heartbeat, drum), `false` during sustained sections or silence. Pair with `playbackIntensity` to differentiate spike vs breathing animations.
+ * - `playbackChainIntensity` — chain-average intensity (0–1) for the active vibration chain, updated every animation frame. Constant across the whole chain — does not vary as the chain decays. 0 outside vibrating chains.
+ * - `playbackChainIsShortBurst` — `true` when the current chain is a short transient burst (its bucket count is less than `opts.shortChainBuckets`). Constant for every bucket in the chain. `false` during sustained chains or silence.
  * - `muted` — whether haptics are suppressed. Triggers a re-render when toggled.
  * - `toggleMuted()` — flips the muted state and updates React state.
  * - `engine` — direct access to the underlying `HapticEngine` instance. Read analysis data (trends, vibrationMap, etc.) here after `ready` is `true`.
@@ -28,17 +28,17 @@ export function useHaptics(mediaRef: RefObject<HTMLMediaElement | null>, opts?: 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [playbackTime, setPlaybackTime] = useState(0)
-  const [playbackIntensity, setPlaybackIntensity] = useState(0)
-  const [playbackIsShortBurst, setPlaybackIsShortBurst] = useState(false)
+  const [playbackChainIntensity, setPlaybackChainIntensity] = useState(0)
+  const [playbackChainIsShortBurst, setPlaybackChainIsShortBurst] = useState(false)
   const [muted, setMuted] = useState(false)
 
   useEffect(() => {
     const engine = engineRef.current
     if (ready && mediaRef.current) {
-      engine.attach(mediaRef.current, (t, intensity, isShortBurst) => {
+      engine.attach(mediaRef.current, (t, chainIntensity, chainIsShortBurst) => {
         setPlaybackTime(t)
-        setPlaybackIntensity(intensity)
-        setPlaybackIsShortBurst(isShortBurst)
+        setPlaybackChainIntensity(chainIntensity)
+        setPlaybackChainIsShortBurst(chainIsShortBurst)
       })
     }
     return () => engine.detach()
@@ -82,8 +82,8 @@ export function useHaptics(mediaRef: RefObject<HTMLMediaElement | null>, opts?: 
     loading,
     error,
     playbackTime,
-    playbackIntensity,
-    playbackIsShortBurst,
+    playbackChainIntensity,
+    playbackChainIsShortBurst,
     muted,
     toggleMuted,
     engine: engineRef.current,

@@ -18,6 +18,13 @@ import {
  * For React projects, use the `useHaptics` hook instead — it manages the lifecycle automatically.
  * When using this class directly, you are responsible for calling `detach()` yourself.
  *
+ * **Buckets and chains**: the audio is split into fixed-size time slices called *buckets* —
+ * each one holds the peak amplitude for that window. The duration per bucket is controlled by
+ * `opts.bucketSize` (default 2646 samples = ~60ms at 44100Hz; e.g. 4410 samples = ~100ms).
+ * A *chain* is a consecutive run of vibrating buckets. Chain-level values (intensity, length,
+ * end time) are aggregated across the whole run and are the same constant for every bucket in
+ * the chain. Bucket-level values vary per slice.
+ *
  * @example
  * ```ts
  * const engine = new HapticEngine()
@@ -47,10 +54,10 @@ export class HapticEngine {
   private _rafId = 0
   private _wasVibrating = false
   private _lastInterruption = 0
-  private _playbackIntensity: number = 0
-  private _playbackIsShortBurst: boolean = false
+  private _playbackChainIntensity: number = 0
+  private _playbackChainIsShortBurst: boolean = false
   private _audioEl: HTMLMediaElement | null = null
-  private _onTick: ((time: number, intensity: number, isShortBurst: boolean) => void) | null = null
+  private _onTick: ((time: number, chainIntensity: number, chainIsShortBurst: boolean) => void) | null = null
   private _cleanup: (() => void) | null = null
 
   /**
@@ -78,7 +85,7 @@ export class HapticEngine {
   /** Browser-side audio processing delay in seconds. Used internally for the mute window calculation. */
   get baseLatency(): number { return this._baseLatency }
 
-  /** Per-bucket amplitude data from the analysis. One entry per ~60ms of audio. Returns a copy. */
+  /** Per-bucket amplitude data from the analysis. One entry per bucket (duration controlled by `opts.bucketSize`, default ~60ms). Returns a copy. */
   get trends(): Trend[] { return structuredClone(this._trends) }
 
   /**
@@ -114,11 +121,22 @@ export class HapticEngine {
   /** Copy of the current algorithm options. Reflects what was passed to the constructor merged with `DEFAULT_OPTIONS`. */
   get opts(): HapticOptions { return {...this._opts} }
 
-  /** Current playback intensity as a 0–1 value, updated every animation frame. 0 = silent or paused, 1 = loudest peak in the audio. Use this to drive visual effects like scaling, brightness, or blur. */
-  get playbackIntensity(): number { return this._playbackIntensity }
+  /**
+   * Chain-average intensity (0–1) for the active vibration chain, updated every animation frame.
+   * Constant across every bucket in the chain — does not vary as the chain decays.
+   * 0 outside vibrating chains (silence, paused, or below noise floor).
+   * This is the value used to compute PWM duty cycle for haptics.
+   */
+  get playbackChainIntensity(): number { return this._playbackChainIntensity }
 
-  /** Whether the current moment is a short transient burst (e.g. a gunshot, heartbeat, drum hit) rather than a sustained section. `true` = sharp hit, fire a spike effect. `false` = sustained sound or silence, use a slower breathing animation. */
-  get playbackIsShortBurst(): boolean { return this._playbackIsShortBurst }
+  /**
+   * Whether the current chain is a short transient burst, updated every animation frame.
+   * Derived from the chain's bucket count: `true` when `chainLength < opts.shortChainBuckets`.
+   * Constant for every bucket in the chain — does not change mid-chain.
+   * `true` = short chain (kick, snap, gunshot — fires as solid MAX pulse).
+   * `false` = sustained chain or silence (fires as PWM pattern).
+   */
+  get playbackChainIsShortBurst(): boolean { return this._playbackChainIsShortBurst }
 
   /** Whether haptics are suppressed. When `true`, `navigator.vibrate()` is never called, but the RAF loop keeps running. */
   get muted(): boolean { return this._muted }
@@ -153,9 +171,9 @@ export class HapticEngine {
    *
    * @param url - URL of the audio file to analyze
    * @param mediaEl - The `<audio>` or `<video>` element to attach to
-   * @param onTick - Optional callback fired every animation frame with the current playback time in seconds
+   * @param onTick - Optional callback fired every animation frame. See `attach()` for argument details.
    */
-  async load(url: string, mediaEl: HTMLMediaElement, onTick?: (time: number, intensity: number, isShortBurst: boolean) => void): Promise<void> {
+  async load(url: string, mediaEl: HTMLMediaElement, onTick?: (time: number, chainIntensity: number, chainIsShortBurst: boolean) => void): Promise<void> {
     await this.analyze(url)
     this.attach(mediaEl, onTick)
   }
@@ -201,9 +219,12 @@ export class HapticEngine {
    * Automatically handles pause, seek, and mute window suppression.
    *
    * @param mediaEl - The `<audio>` or `<video>` element to sync haptics with
-   * @param onTick - Optional callback fired every animation frame with the current playback time in seconds
+   * @param onTick - Optional callback fired every animation frame while playing.
+   *   - `time` — current playback position in seconds
+   *   - `chainIntensity` — chain-average intensity (0–1); 0 outside vibrating chains. Same as `playbackChainIntensity`.
+   *   - `chainIsShortBurst` — `true` if the chain is shorter than `opts.shortChainBuckets`. Same as `playbackChainIsShortBurst`.
    */
-  attach(mediaEl: HTMLMediaElement, onTick?: (time: number, intensity: number, isShortBurst: boolean) => void): void {
+  attach(mediaEl: HTMLMediaElement, onTick?: (time: number, chainIntensity: number, chainIsShortBurst: boolean) => void): void {
     this.detach()
     this._audioEl = mediaEl
     this._onTick = onTick ?? null
@@ -255,8 +276,8 @@ export class HapticEngine {
           const shouldVib = this._vibrationMap[bucketIndex] ?? false
 
           // Visual sync: updated every frame regardless of mute window
-          this._playbackIntensity = shouldVib ? (this._chainIntensity[bucketIndex] ?? 0) : 0
-          this._playbackIsShortBurst = shouldVib ? this._chainLength[bucketIndex] < this._opts.shortChainBuckets : false
+          this._playbackChainIntensity = shouldVib ? (this._chainIntensity[bucketIndex] ?? 0) : 0
+          this._playbackChainIsShortBurst = shouldVib ? this._chainLength[bucketIndex] < this._opts.shortChainBuckets : false
 
           // Haptics: gated by mute window
           if (!inMuteWindow) {
@@ -277,11 +298,11 @@ export class HapticEngine {
             }
           }
         } else {
-          this._playbackIntensity = 0
-          this._playbackIsShortBurst = false
+          this._playbackChainIntensity = 0
+          this._playbackChainIsShortBurst = false
         }
 
-        this._onTick?.(currentTime, this._playbackIntensity, this._playbackIsShortBurst)
+        this._onTick?.(currentTime, this._playbackChainIntensity, this._playbackChainIsShortBurst)
       }
       this._rafId = requestAnimationFrame(tick)
     }
