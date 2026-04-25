@@ -213,7 +213,7 @@ export class HapticEngine {
     this._pattern = trendsToVibrationPattern(this._trends, this._vibrationMap)
     const { chainEndTime, chainIntensity, chainLength } = computeChainData(this._trends, this._vibrationMap, this._opts)
     this._chainEndTime = chainEndTime
-    this._chainIntensity = chainIntensity
+    this._chainIntensity = chainIntensity.map((v, i) => this._vibrationMap[i] ? Math.max(this._opts.intensityFloor, v) : v)
     this._chainLength = chainLength
 
     const peak = this._trends.reduce((max, t) => Math.max(max, t.max), 0)
@@ -288,7 +288,7 @@ export class HapticEngine {
 
           // Visual sync: updated every frame regardless of mute window
           this._playbackChainIntensity = shouldVib ? (this._chainIntensity[bucketIndex] ?? 0) : 0
-          this._playbackBucketIntensity = shouldVib ? computeIntensity(this._trends[bucketIndex].max, this._noiseFloor) : 0
+          this._playbackBucketIntensity = shouldVib ? Math.max(this._opts.intensityFloor, computeIntensity(this._trends[bucketIndex].max, this._noiseFloor)) : 0
           this._playbackChainIsShortBurst = shouldVib ? this._chainLength[bucketIndex] < this._opts.shortChainBuckets : false
 
           // Haptics: gated by mute window
