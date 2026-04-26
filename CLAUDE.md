@@ -60,7 +60,7 @@ tsconfig.lib.json      — library declaration emit only (outDir: lib, excludes 
 1. **Fetch & decode**: `analyzeAudio(url)` fetches audio, decodes via `AudioContext.decodeAudioData()`, returns first channel's `Float32Array` (full-spectrum), plus `outputLatency`/`baseLatency`. `decodeAudioBuffer(arrayBuffer)` exported separately for raw bytes.
 2. **Bucket trends**: `computeTrends(data, sampleRate, bucketSize)` splits into buckets (default 2646 samples ≈ ~60ms), computes min/max per bucket plus leftRms/rightRms (unused by vibration logic). O(1) index: `trends[floor(currentTime * sampleRate / bucketSize)]`.
 3. **Vibration map**: `computeVibrationMap(trends, opts?)` returns `boolean[]` — sustain check first, then noise floor gate, then past-only neighbor comparison. Vibrates when ratio >= `opts.spikeRatio`.
-4. **Chain data**: `computeChainData(trends, vibrationMap, opts)` walks the vibrationMap, groups consecutive `true` runs into chains. For each bucket stores: `chainEndTime` (end of its run), `chainIntensity` (avg `computeIntensity` across run), `chainLength` (bucket count of run). All three are parallel arrays indexed by bucket.
+4. **Chain data**: `computeChainData(trends, vibrationMap, opts)` walks the vibrationMap, groups consecutive `true` runs into chains. For each bucket stores: `chainEndTime` (end of its run), `chainIntensity` (avg `computeIntensity` across run, then floored to `intensityFloor` for in-chain buckets when stored by `HapticEngine`), `chainLength` (bucket count of run). All three are parallel arrays indexed by bucket.
 5. **Vibration pattern**: `trendsToVibrationPattern(trends, vibrationMap)` converts to Vibration API format `[vibrate, pause, ...]`. Used for the fire-and-forget Vibrate button only.
 6. **Display**: ResultView shows per-chain rows with time range, bucket count, intensity %, MAX or PWM pattern. WaveformView shows intensity-colored overlays (cyan→yellow→red) where `vibrationMap[i]` is true.
 
@@ -132,7 +132,7 @@ Every prior approach used an *absolute* reference (fixed threshold, fixed freque
 ### What Changed from Main Branch (cumulative across all merged branches)
 - **Removed**: `shouldVibrate()` → `computeVibrationMap()`. Bass filter. `PREVIOUS_WEIGHT`. Individual constant exports. DOM `play`/`playing` event listener for `_lastInterruption`.
 - **Added**: `HapticEngine` class with `get opts()`. `HapticOptions` + `DEFAULT_OPTIONS` (10 knobs). `analyzeBuffer()`. `computeNoiseFloor()`. `computeIntensity()`. `intensityToPattern()` with PWM. `computeChainData()` returning `chainEndTime/chainIntensity/chainLength`. `sustainLowerBound`/`sustainUpperBound` (replaces `sustainThreshold`). `shortChainBuckets`. Chain-based RAF firing (fire once at entry, not per-frame). Intensity-colored waveform overlays. Per-chain ResultView display. Snapshot tests (6 fixtures, 12 tests). VibrationTester section. `useHaptics` React hook. SimpleUsage and MediaUsage demo components built using the hook.
-- **Changed**: RAF loop fires `intensityToPattern(remainingMs, chainIntensity, opts)` at chain entry. Short chains fire solid `[remainingMs]`. `trendsToVibrationPattern()` demoted to fire-and-forget button only. Mute window `_lastInterruption` now set inside RAF on paused→playing transition (not from DOM event) — fixes early haptics with native `<audio>`/`<video>` controls.
+- **Changed**: RAF loop fires `intensityToPattern(remainingMs, chainIntensity, opts)` at chain entry. Short chains fire solid `[remainingMs]`. `trendsToVibrationPattern()` demoted to fire-and-forget button only. Mute window `_lastInterruption` now set inside RAF on paused→playing transition (not from DOM event) — fixes early haptics with native `<audio>`/`<video>` controls. `_chainIntensity` stored with `intensityFloor` applied for in-chain buckets; `_playbackBucketIntensity` applies floor at read time — both now match the intensity the haptic actually fires at.
 
 ## Key Decisions & Learnings
 
@@ -191,7 +191,7 @@ engine.opts                                             // get copy of current H
 ```
 
 ### Getters (all return copies — no mutation leaks)
-`channelData` (Float32Array copy), `trends` (structuredClone), `vibrationMap`/`chainEndTime`/`chainIntensity`/`chainLength`/`pattern` (spread), `opts` (spread — all primitive fields), primitives returned directly.
+`channelData` (Float32Array copy), `trends` (structuredClone), `vibrationMap`/`chainEndTime`/`chainIntensity`/`chainLength`/`pattern` (spread), `opts` (spread — all primitive fields), primitives returned directly. `chainIntensity` in-chain values have `intensityFloor` applied at storage time (matches what `intensityToPattern` actually fires).
 
 ### RAF loop (chain-based firing)
 - Fires `navigator.vibrate(pattern)` once when `_wasVibrating` transitions false→true
@@ -384,8 +384,8 @@ await engine.analyze(url)         // fetch + decode + run analysis pipeline
 engine.attach(mediaEl, (time, chainIntensity, bucketIntensity, chainIsShortBurst) => {
   // called every RAF frame while playing
   // time: current playback position in seconds
-  // chainIntensity: 0–1, chain-average intensity — constant for the whole vibration chain
-  // bucketIntensity: 0–1, per-bucket intensity — varies frame-by-frame as audio decays. Use this for visuals.
+  // chainIntensity: 0–1, chain-average intensity (intensityFloor applied) — constant for the whole vibration chain
+  // bucketIntensity: 0–1, per-bucket intensity (intensityFloor applied) — varies frame-by-frame as audio decays. Use this for visuals.
   // chainIsShortBurst: true = short transient chain (kick, gunshot, heartbeat), false = sustained chain or silence
   updateVisualizer(bucketIntensity, chainIsShortBurst)
 })
@@ -425,8 +425,8 @@ const { playbackTime } = useHaptics(audioRef)
 
 // visual sync — all three update every RAF frame, trigger re-renders automatically
 const { playbackBucketIntensity, playbackChainIntensity, playbackChainIsShortBurst } = useHaptics(audioRef)
-// playbackBucketIntensity: 0–1, per-bucket — varies frame-by-frame as audio decays. Use this for visuals.
-// playbackChainIntensity: 0–1, chain-average — constant across the whole chain. Used internally for PWM.
+// playbackBucketIntensity: 0–1, per-bucket (intensityFloor applied) — varies frame-by-frame as audio decays. Use this for visuals.
+// playbackChainIntensity: 0–1, chain-average (intensityFloor applied) — constant across the whole chain. Used internally for PWM.
 // playbackChainIsShortBurst: true = short transient chain (kick drum, gunshot, heartbeat)
 //                            false = sustained chain (bass hold, long note) or silence
 
@@ -480,7 +480,7 @@ This approach was prototyped and confirmed the primitives work. The visual resul
 
 3. **Examples section** — 3 video examples, stacked vertically (scroll, not carousel). Each is its own self-contained React component with its own `useHaptics` hook. Auto-analyzes on mount so haptics are ready before the user hits play. Playing the video = haptics fire automatically, no separate button. Subtle credit under each video.
 
-4. **Try it yourself section** — URL input (with a note: keep audio/video under 1 minute — analysis runs on the full file before playback). A live code snippet below showing React usage that updates as the URL changes.
+4. **Try it yourself section** — URL input + file upload (both supported: URL uses `analyze(url)`, file uses `analyzeBuffer(await file.arrayBuffer())`). Note: keep audio/video under 1 minute — analysis runs on the full file before playback. A live code snippet below showing React usage that updates as the URL/file changes.
 
 5. **Minimal docs** — just the two import paths, a vanilla JS snippet and a React snippet. No deep API docs — those come post-v1.
 
