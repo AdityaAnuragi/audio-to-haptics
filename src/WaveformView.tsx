@@ -189,70 +189,70 @@ export default function WaveformView({channelData, sampleRate, trends, playing, 
 
   return (
     <div>
-      <h3>Waveform</h3>
-      <p style={{fontSize: '12px', color: '#888', margin: '4px 0'}}>
-        Viewing {startMs}ms – {endMs}ms (window: {windowMs}ms)
-        {' | '}<span style={{color: 'cyan'}}>cyan = vibration</span>
-        {' | '}<span style={{color: 'rgba(255, 100, 100, 0.6)'}}>dashed = threshold ({VIBRATE_THRESHOLD})</span>
-      </p>
-      <canvas
-        ref={canvasRef}
-        width={800}
-        height={300}
-        style={{width: '100%', height: 'auto', border: '1px solid #333'}}
-      />
-      {/* Playhead bar below canvas — matches canvas plot area padding */}
-      <div style={{
-        position: 'relative',
-        height: '12px',
-        background: '#111',
-        marginLeft: `${PAD_LEFT_PCT}%`,
-        marginRight: `${PAD_RIGHT_PCT}%`,
-        borderRadius: '2px',
-        overflow: 'hidden',
-      }}>
-        {inWindow && <div style={{
-          position: 'absolute',
-          left: `${playheadPct}%`,
-          top: 0,
-          bottom: 0,
-          width: '2px',
-          background: '#fff',
-          transition: 'none',
-        }}/>}
-      </div>
-      <div style={{display: 'flex', gap: '8px', marginTop: '8px', alignItems: 'center'}}>
-        <button onClick={() => setOffset(0)} disabled={offset === 0}>
-          |←
-        </button>
-        <button onClick={() => setOffset(Math.max(0, offset - stepSize))} disabled={offset === 0}>
-          ←
-        </button>
-        <button onClick={() => setOffset(Math.min(maxOffset, offset + stepSize))} disabled={offset >= maxOffset}>
-          →
-        </button>
-        <button onClick={() => setOffset(maxOffset)} disabled={offset >= maxOffset}>
-          →|
-        </button>
-        <span style={{fontSize: '12px', color: '#888'}}>
-          {Math.round(offset / channelData.length * 100)}% through audio
-        </span>
-      </div>
+      {/*<h3>Waveform</h3>*/}
+      {/*<p style={{fontSize: '12px', color: '#888', margin: '4px 0'}}>*/}
+      {/*  Viewing {startMs}ms – {endMs}ms (window: {windowMs}ms)*/}
+      {/*  {' | '}<span style={{color: 'cyan'}}>cyan = vibration</span>*/}
+      {/*  {' | '}<span style={{color: 'rgba(255, 100, 100, 0.6)'}}>dashed = threshold ({VIBRATE_THRESHOLD})</span>*/}
+      {/*</p>*/}
+      {/*<canvas*/}
+      {/*  ref={canvasRef}*/}
+      {/*  width={800}*/}
+      {/*  height={300}*/}
+      {/*  style={{width: '100%', height: 'auto', border: '1px solid #333'}}*/}
+      {/*/>*/}
+      {/*/!* Playhead bar below canvas — matches canvas plot area padding *!/*/}
+      {/*<div style={{*/}
+      {/*  position: 'relative',*/}
+      {/*  height: '12px',*/}
+      {/*  background: '#111',*/}
+      {/*  marginLeft: `${PAD_LEFT_PCT}%`,*/}
+      {/*  marginRight: `${PAD_RIGHT_PCT}%`,*/}
+      {/*  borderRadius: '2px',*/}
+      {/*  overflow: 'hidden',*/}
+      {/*}}>*/}
+      {/*  {inWindow && <div style={{*/}
+      {/*    position: 'absolute',*/}
+      {/*    left: `${playheadPct}%`,*/}
+      {/*    top: 0,*/}
+      {/*    bottom: 0,*/}
+      {/*    width: '2px',*/}
+      {/*    background: '#fff',*/}
+      {/*    transition: 'none',*/}
+      {/*  }}/>}*/}
+      {/*</div>*/}
+      {/*<div style={{display: 'flex', gap: '8px', marginTop: '8px', alignItems: 'center'}}>*/}
+      {/*  <button onClick={() => setOffset(0)} disabled={offset === 0}>*/}
+      {/*    |←*/}
+      {/*  </button>*/}
+      {/*  <button onClick={() => setOffset(Math.max(0, offset - stepSize))} disabled={offset === 0}>*/}
+      {/*    ←*/}
+      {/*  </button>*/}
+      {/*  <button onClick={() => setOffset(Math.min(maxOffset, offset + stepSize))} disabled={offset >= maxOffset}>*/}
+      {/*    →*/}
+      {/*  </button>*/}
+      {/*  <button onClick={() => setOffset(maxOffset)} disabled={offset >= maxOffset}>*/}
+      {/*    →|*/}
+      {/*  </button>*/}
+      {/*  <span style={{fontSize: '12px', color: '#888'}}>*/}
+      {/*    {Math.round(offset / channelData.length * 100)}% through audio*/}
+      {/*  </span>*/}
+      {/*</div>*/}
       {playing && <>
         <div style={{display: 'flex', gap: '8px', marginTop: '8px'}}>
-          <div style={{
-            flex: 1,
-            padding: '6px 12px',
-            background: isLoud ? '#0ff' : '#333',
-            color: isLoud ? '#000' : '#666',
-            fontFamily: 'monospace',
-            fontSize: '14px',
-            fontWeight: 'bold',
-            textAlign: 'center',
-            borderRadius: '4px',
-          }}>
-            {isLoud ? 'SOUND' : 'silence'}
-          </div>
+          {/*<div style={{*/}
+          {/*  flex: 1,*/}
+          {/*  padding: '6px 12px',*/}
+          {/*  background: isLoud ? '#0ff' : '#333',*/}
+          {/*  color: isLoud ? '#000' : '#666',*/}
+          {/*  fontFamily: 'monospace',*/}
+          {/*  fontSize: '14px',*/}
+          {/*  fontWeight: 'bold',*/}
+          {/*  textAlign: 'center',*/}
+          {/*  borderRadius: '4px',*/}
+          {/*}}>*/}
+          {/*  {isLoud ? 'SOUND' : 'silence'}*/}
+          {/*</div>*/}
           <div style={{
             flex: 1,
             padding: '6px 12px',

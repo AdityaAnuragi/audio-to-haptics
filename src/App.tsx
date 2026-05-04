@@ -247,7 +247,7 @@ function App() {
 
       {result && <>
         <WaveformView channelData={result.channelData} sampleRate={result.sampleRate} trends={trends} playing={playing} elapsed={elapsed} audioEl={audioRef.current}/>
-        <ResultView result={result} trends={trends} pattern={pattern}/>
+        {/*<ResultView result={result} trends={trends} pattern={pattern}/>*/}
       </>}
     </div>
   )
