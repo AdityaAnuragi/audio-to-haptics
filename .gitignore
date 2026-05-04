@@ -24,3 +24,13 @@ dist-ssr
 *.sw?
 
 CLAUDE.md
+
+# Library build output
+lib/
+
+# npm pack output
+*.tgz
+
+# Local test audio files
+public/*.mp3
+
