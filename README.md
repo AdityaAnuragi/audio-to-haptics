@@ -4,7 +4,7 @@ Converts audio into haptic (vibration) feedback patterns using the Web Audio API
 
 Only works on Android Chrome and some mobile browsers — no desktop vibration support.
 
-**[Docs & demo → REPLACE_WITH_DOCS_URL](REPLACE_WITH_DOCS_URL)**
+**[Docs & demo → https://audio-to-haptics.pages.dev](https://audio-to-haptics.pages.dev)**
 
 ---
 
