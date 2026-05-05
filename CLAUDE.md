@@ -1,7 +1,7 @@
 # Audio to Haptics
 
 ## Project Overview
-Web app that converts audio into haptic (vibration) feedback patterns. Takes an audio URL, analyzes the waveform using Web Audio API, and generates a vibration pattern for the Vibration API. Built with React 19 + TypeScript + Vite 7. Intended to become a standalone npm library (`audio-to-haptics`).
+Web app that converts audio into haptic (vibration) feedback patterns. Takes an audio URL, analyzes the waveform using Web Audio API, and generates a vibration pattern for the Vibration API. Built with React 19 + TypeScript + Vite 7. Published as `audio-to-haptics` on npm — landing page at https://audio-to-haptics.pages.dev.
 
 ## Tech Stack
 - **Framework**: React 19 with React Compiler (babel-plugin-react-compiler)
@@ -216,19 +216,20 @@ engine.opts                                             // get copy of current H
 
 ## TODO
 
-### v0.0.1 (first publish)
-- Final device testing pass: SimpleUsage and MediaUsage on Samsung
-- ~~npm package setup~~ ✅ — library build configured, exports map set, peerDeps, version 0.0.1
-- LICENSE file (MIT) — **add before going public on GitHub and before npm publish**
-- ~~`npm pack` → verify tarball contents~~ ✅ — `audio-to-haptics-0.0.1.tgz` generated
-- Landing page — separate repo, Astro + React islands, deploys to Cloudflare Pages
-- Publish library + deploy landing page simultaneously
+### v0.0.2 ✅ SHIPPED (2026-05-05)
+- ~~Final device testing pass~~ ✅
+- ~~npm package setup~~ ✅ — library build configured, exports map set, peerDeps
+- ~~LICENSE file (MIT)~~ ✅
+- ~~Landing page~~ ✅ — https://audio-to-haptics.pages.dev (separate repo, Astro + React islands, Cloudflare Pages)
+- ~~Publish library~~ ✅ — `audio-to-haptics@0.0.2` live on npm
+- ~~`react` moved from `dependencies` to `devDependencies`~~ ✅
+- ~~`"license": "MIT"` added to package.json~~ ✅
 
-### Post-v0.0.1 (landing page / docs)
+### Post-v0.0.2 (landing page / docs)
 - **Interactive knobs playground**: sliders for all `HapticOptions` knobs, waveform updates live as you drag, feel the difference on device. Similar to the web-haptics.dev custom haptic builder — visual timeline + real-time feedback. Good for docs and for convincing people the library is worth using.
 - **Knob explanations with diagrams**: explain what each knob does in plain terms, ideally with a simplified visual (e.g. show spikeRatio as a threshold line on a waveform, show PWM cycle as on/off blocks). Interactive version above covers this but a static diagram version is good fallback.
 
-### Post-v0.0.1
+### Post-v0.0.2
 - **`analyzeBuffer` demo**: File input or drag-and-drop component. Validates the raw bytes path.
 - **Buffering/waiting handling**: `waiting`/`stalled` events not listened to — haptics fire into silence during network buffering. Applies to any remote URL (MP3, MP4, etc.), not just adaptive streams. Hasn't been an issue because test files were small/fast. Should suppress haptics until `playing` fires.
 - **Streaming support**: Chunked `analyzeBuffer` appending to `_trends` incrementally. Challenge: `computeNoiseFloor` needs a running peak estimate.
