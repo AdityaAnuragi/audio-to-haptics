@@ -6,6 +6,8 @@ Only works on Android Chrome and some mobile browsers — no desktop vibration s
 
 **[Docs & demo → https://audio-to-haptics.pages.dev](https://audio-to-haptics.pages.dev)**
 
+**[Want to learn more? Read the full writeup on Dev.to →](https://dev.to/adityaanuragi00128/audio-to-haptics-perfectly-syncing-phone-vibration-to-audio-on-the-web-how-i-made-it-3gip)**
+
 ---
 
 ## Install
