@@ -32,11 +32,9 @@
     "preview": "vite preview",
     "test": "vitest run"
   },
-  "dependencies": {
-    "react": ">=19",
-    "react-dom": "^19.2.0"
-  },
   "devDependencies": {
+    "react": ">=19",
+    "react-dom": "^19.2.0",
     "@eslint/js": "^9.39.1",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
