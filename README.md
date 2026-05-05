@@ -4,6 +4,43 @@ Converts audio into haptic (vibration) feedback patterns using the Web Audio API
 
 Only works on Android Chrome and some mobile browsers — no desktop vibration support.
 
+**[Docs & demo → REPLACE_WITH_DOCS_URL](REPLACE_WITH_DOCS_URL)**
+
+---
+
+## Install
+
+```bash
+npm install audio-to-haptics
+```
+
+---
+
+## Usage
+
+**Vanilla JS / any framework:**
+
+```js
+import { HapticEngine } from 'audio-to-haptics'
+
+const engine = new HapticEngine()
+await engine.analyze(url)
+engine.attach(audioElement, (time) => updateUI(time))
+engine.detach()
+```
+
+**React:**
+
+```tsx
+import { useHaptics } from 'audio-to-haptics/react'
+
+const audioRef = useRef(null)
+const { analyze, ready } = useHaptics(audioRef)
+
+<audio ref={audioRef} controls />
+<button onClick={() => analyze(url)}>{ready ? 'Re-analyze' : 'Analyze'}</button>
+```
+
 ---
 
 ## This Repository
